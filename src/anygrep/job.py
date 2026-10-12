@@ -517,22 +517,38 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
     st, stale = check(index)
     if st is None:
         return StopResult("none", None, stale)
-    request_stop(index)
+    # Under the mutex, so the stop file is only made while the job's state
+    # exists: the worker removes both in one step under the mutex, and a stop
+    # file made after that would be left behind.
+    with job_mutex(index):
+        cur = read_state(index)
+        if cur is None:  # it finished meanwhile
+            return StopResult("none", None, stale)
+        st = cur
+        request_stop(index)
     last = st
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         cur = read_state(index)
-        if cur is None:  # the worker cleaned up; give it a moment to exit
-            end = time.monotonic() + KILL_WAIT
-            while pid_running(last.pid) and time.monotonic() < end:
-                time.sleep(0.1)
-            return StopResult("stopped", _take_final(index) or last)
+        if cur is None:  # the worker cleaned up
+            break
         last = cur
         if liveness(index, cur) == "stale":
             break
         time.sleep(0.2)
     cur = read_state(index)
-    if cur is not None and liveness(index, cur) == "alive" and cur.pid <= 0:
+    if cur is None:
+        # The worker has removed its state (and is maybe still exiting). It
+        # does its whole cleanup under the mutex, so once the mutex is free
+        # the stop file is gone and the writer lock released; give the
+        # process a moment to exit too.
+        with job_mutex(index):
+            pass
+        end = time.monotonic() + KILL_WAIT
+        while pid_running(last.pid) and time.monotonic() < end:
+            time.sleep(0.1)
+        return StopResult("stopped", _take_final(index) or last)
+    if liveness(index, cur) == "alive" and cur.pid <= 0:
         # Still starting: no worker has written its PID yet (the spawn may
         # be slow). Mark the job cancelled, keeping the stop file: its worker
         # checks the state is its own and not cancelled before it takes the
@@ -563,7 +579,7 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
             return StopResult("failed", cur)
     with job_mutex(index):
         clear_state(index)
-    return StopResult("stopped", last)
+    return StopResult("stopped", _take_final(index) or last)
 
 
 # ---------------------------------------------------------------- worker

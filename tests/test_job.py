@@ -478,6 +478,55 @@ def test_stop_kills_its_own_worker(reused_pid, monkeypatch) -> None:
     assert not job.job_paths(index).state.exists()
 
 
+def test_stop_returns_after_the_worker_cleaned_up(tmp_path: Path, monkeypatch) -> None:
+    """`index --stop` leaves no stop file, state or final counts behind, even
+    when the worker sees the stop file and cleans up at once (the stop file
+    used to be made in two steps, and the second one could make it again)."""
+    import threading
+
+    index = tmp_path / "index.sqlite"
+    jp = job.job_paths(index)
+    me = os.getpid()
+    st = job.JobState(job_id="b" * 32, pid=me, pid_start=job.process_start(me) or "",
+                      phase="images", started_at=time.time(), scope=[str(tmp_path)],
+                      files_total=10, files_done=3)  # fmt: skip
+    job.write_state(index, st)
+    holding = threading.Event()
+    real_create = job._create_private
+
+    def slow_create(p: Path) -> None:
+        real_create(p)
+        if p == jp.stop:
+            time.sleep(0.3)  # the stopping process is slow to go on
+
+    monkeypatch.setattr(job, "_create_private", slow_create)
+    monkeypatch.setattr(job, "KILL_WAIT", 0.3)  # this "worker" never exits
+
+    def worker() -> None:  # what run_worker does when it sees the stop file
+        lock = acquire_writer_lock(index)
+        holding.set()
+        end = time.monotonic() + 10
+        while not jp.stop.exists() and time.monotonic() < end:
+            time.sleep(0.01)
+        with job.job_mutex(index):
+            cur = job.read_state(index)
+            cur.files_done = 4
+            jp.final.write_text(cur.to_json(), encoding="utf-8")
+            job.clear_state(index)
+            lock.close()
+
+    t = threading.Thread(target=worker)
+    t.start()
+    try:
+        assert holding.wait(10)
+        r = job.stop(index, timeout=5)
+    finally:
+        t.join(10)
+    assert r.result == "stopped" and r.state.files_done == 4
+    assert not jp.state.exists() and not jp.stop.exists() and not jp.final.exists()
+    assert not job.lock_held(index)
+
+
 # 12 --------------------------------------------------------------- stop while starting
 def _worker_args(index: Path, job_id: str, folder: Path):
     args = cli.parse_args(
