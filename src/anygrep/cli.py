@@ -684,6 +684,8 @@ DEFAULT_N = 10
 WEAK_FALLBACK = 3  # weak results shown when nothing passes the cutoff
 WEAK_FALLBACK_MAX = 10  # ... or up to this many when -m is given
 SIMILAR_SHOWN = 3  # paths listed in the "(+N similar: ...)" note
+# Results past -m looked at for the "just below the cutoff" line.
+HIDDEN_SCAN = 50
 NO_STRONG = "No strong matches; showing the closest results."
 BUSY = "anygrep: the index is being updated by another anygrep process. Try again when it is done."
 NO_STRONG_PIPE = "anygrep: no strong matches (use --weak to see the closest)"
@@ -691,11 +693,26 @@ GREP_SNIPPET_COLS = 200
 JSON_SNIPPET_COLS = 240
 
 
+def _hidden_line(near: list[int], n: int, capped: bool) -> str:
+    """The line about results just below the cutoff: `near` holds their
+    positions in the --weak list, `n` is -m and `capped` says the list was
+    cut where more of them may follow."""
+    count = len(near)
+    what, them = ("results", "them") if count != 1 else ("result", "it")
+    if capped:
+        how = f"--weak and a larger -m show {them}"
+    elif near[-1] >= n:
+        how = f"--weak -m {near[-1] + 1} shows {them}"
+    else:
+        how = f"--weak shows {them}"
+    return f"{'at least ' if capped else ''}{count} more {what} just below the cutoff ({how})"
+
+
 def _print_human(
-    hits, query: str | None, color: bool, fallback: bool = False, hidden: int = 0
+    hits, query: str | None, color: bool, fallback: bool = False, hidden: str = ""
 ) -> None:
     """The terminal view: rank, score, location and a snippet per result.
-    `hidden`: results just below the cutoff that --weak would show."""
+    `hidden`: the line about results just below the cutoff (_hidden_line())."""
     from .search import snippet
 
     width = 160
@@ -728,9 +745,7 @@ def _print_human(
             note = f"(+{len(h.similar)} similar: {', '.join(names)}{', ...' if more else ''})"
             print("      " + _style(note, "2", color))
     if hidden:
-        what, them = ("results", "them") if hidden != 1 else ("result", "it")
-        line = f"{hidden} more {what} just below the cutoff (--weak shows {them})"
-        print(_style(line, "2", color))
+        print(_style(hidden, "2", color))
 
 
 def _grep_line(h, query: str | None, color: bool) -> str:
@@ -1199,7 +1214,7 @@ def _note_added(new_roots: list[str], store, note) -> None:
 
 def _search(args, store) -> int:
     from .paths import canonical
-    from .search import image_query, query_budget, scope_matcher, search
+    from .search import image_query, near_floor, query_budget, scope_matcher, search
 
     args.after_notes = []
     qimage = args.qimage
@@ -1257,7 +1272,7 @@ def _search(args, store) -> int:
         hits = find(n, hide_weak=not args.weak)
         if mode == "human":
             fallback = False
-            hidden = 0
+            hidden = ""
             if not hits and not args.weak:
                 # Nothing passes the cutoff: show the closest few, marked as weak.
                 few = WEAK_FALLBACK if args.max_count is None else min(n, WEAK_FALLBACK_MAX)
@@ -1265,8 +1280,16 @@ def _search(args, store) -> int:
                 fallback = bool(hits)
             elif not args.weak:
                 # Say how many results --weak would add just below the cutoff,
-                # so such a file is not taken for missing.
-                hidden = sum(h.near for h in find(n, hide_weak=False))
+                # so such a file is not taken for missing, also past -m (up to
+                # HIDDEN_SCAN more results, with the same scope, types and
+                # grouping of copies).
+                limit = n + HIDDEN_SCAN
+                more = find(limit, hide_weak=False)
+                near = [i for i, h in enumerate(more) if h.near]
+                if near:
+                    last = more[-1]
+                    capped = len(more) >= limit and (last.exact or last.score >= near_floor())
+                    hidden = _hidden_line(near, n, capped)
             _print_human(hits, query_text, color, fallback, hidden)
         elif mode != "quiet":
             if not hits:

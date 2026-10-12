@@ -1033,8 +1033,16 @@ def test_hidden_weak_results_are_counted(
     assert out.count(line) == 1
     code, out, _ = run(capsys, "bread", str(notes), "--weak")
     assert code == 0 and line not in out
+    # Past -m: still counted, with the -m that --weak needs to show them.
+    rows = jsonl(run(capsys, "bread", str(notes), "--json", "--weak", "-m", "100")[1])
+    last = max(i for i, r in enumerate(rows) if r["weak"]) + 1
     code, out, _ = run(capsys, "bread", str(notes), "-m", "1")
-    assert line not in out  # nothing weak in the top 1
+    assert out.splitlines()[-1] == f"{n_weak} more results {line} (--weak -m {last} shows them)"
+    # A bounded look past -m: "at least" when more may follow.
+    monkeypatch.setattr(cli, "HIDDEN_SCAN", 1)
+    code, out, _ = run(capsys, "bread", str(notes), "-m", "1")
+    assert out.splitlines()[-1] == f"at least 1 more result {line} (--weak and a larger -m show it)"
+    monkeypatch.setattr(cli, "HIDDEN_SCAN", 50)
     code, out, _ = run(capsys, NONSENSE, str(notes))
     assert code == 1 and line not in out  # the closest results are shown instead
     # Results far below the cutoff are not counted.

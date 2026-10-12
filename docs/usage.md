@@ -254,9 +254,14 @@ file is tried again only when it changes, but it counts on every run until then 
 
 Search hides results whose score is below the cutoff for their type (see [relevance.md](relevance.md)).
 `--weak` shows them too, marked `(weak)`, and then they count as matches for the exit status. On a
-terminal, when results within `-m` were left out with a score just under the cutoff (less than 0.02
-below it), the list ends with a dim line such as `2 more results just below the cutoff (--weak shows
-them)`, so such a file is not taken for missing. Results further below are not counted. When nothing passes the cutoff, anygrep says "No strong matches; showing the closest results"
+terminal, when results were left out with a score just under the cutoff (less than 0.02 below it),
+the list ends with a dim line such as `2 more results just below the cutoff (--weak shows them)`, so
+such a file is not taken for missing. Results further below are not counted. The count also covers
+up to 50 results past `-m`; when some of them would not fit in `-m`, the line says which `-m` shows
+them (`1 more result just below the cutoff (--weak -m 4 shows it)`), and when more may lie past those
+50 it says "at least" (`at least 3 more results ... (--weak and a larger -m show them)`). PATHs,
+`-g`, `-t` and the grouping of near-duplicates apply as for the results shown. When nothing passes
+the cutoff, anygrep says "No strong matches; showing the closest results"
 and lists the closest three, or `-m` of them (at most 10) when you give `-m`, marked as weak; the exit
 status is still 1. Piped output, `-l` and `--json` show weak results only with `--weak` (in `--json`
 with `"weak": true`); otherwise they print nothing and stderr says

@@ -27,8 +27,9 @@ All notable changes to anygrep are listed here. The format follows
   `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;
   the index file grows by about a third to a half (47% in a test with 2,000 notes).
 - On a terminal, a search that hid results just below the cutoff ends with one dim line such as `2 more
-  results just below the cutoff (--weak shows them)`. Piped output, `-l`, `--json` and the exit status
-  do not change.
+  results just below the cutoff (--weak shows them)`. It also counts up to 50 results past `-m` and
+  then names the `-m` that shows them, or says "at least" when more may follow. Piped output, `-l`,
+  `--json` and the exit status do not change.
 
 ### Changed
 

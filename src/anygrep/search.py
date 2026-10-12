@@ -16,7 +16,7 @@ from .config import DEFAULT_IMAGE_BUDGET
 from .paths import canonical
 from .signature import changed_share, signature
 from .store import Hit, Store, Vectors, fold, word_pattern
-from .thresholds import weak_mask
+from .thresholds import MIN_SCORES, weak_mask
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -264,6 +264,13 @@ EXACT_COMMON_MIN_FILES = 3
 # A weak result counts as just below the cutoff (Hit.near) when its score
 # is less than this under the score it needs.
 NEAR_MARGIN = 0.02
+
+
+def near_floor() -> float:
+    """No result scoring below this is near the cutoff (Hit.near), whatever
+    the query, result type or image budget: every cutoff is at least its
+    pair's minimum score."""
+    return min(v for table in MIN_SCORES.values() for v in table.values()) - NEAR_MARGIN
 
 
 def exact_needle(query: str | None) -> str | None:
