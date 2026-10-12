@@ -160,7 +160,7 @@ def test_index_from_before_exact_matching(
     st = Store(path)  # a writer creates the table; the chunks wait for an update
     assert st.exact_state() == "building" and st.fts_gap() is not None
     assert query(st, fake_embedder, "ABC-77812")[0].exact
-    assert st.fill_fts(max_seconds=0) is False  # out of time: nothing done yet
+    assert st.fill_fts(max_seconds=-1) is False  # out of time: nothing done yet
     st.fill_fts()
     assert st.exact_state() == "ready" and st.fts_gap() is None
     assert query(st, fake_embedder, "ABC-77812")[0].exact
