@@ -6,6 +6,7 @@ import sqlite3
 import unicodedata
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import anygrep
@@ -779,3 +780,88 @@ def test_settings_error_counts_as_damage() -> None:
     e = sqlite3.OperationalError("invalid fts5 file format (found 99, expected 4 or 5)")
     assert store._corrupt(e)
     assert not store._corrupt(sqlite3.OperationalError("no such table: x"))
+
+
+def chunk(text: str) -> store.ChunkData:
+    return store.ChunkData(0, np.ones(store.EMBED_DIM, np.float32), text)
+
+
+def chunk_ids(st: Store) -> set[int]:
+    return {r[0] for r in st.db.execute("SELECT id FROM chunks")}
+
+
+def one_chunk(path: Path) -> None:
+    st = Store(path)
+    with st.transaction():
+        st.put_file("/n/a.txt", "text", 1, 1, "s", None, "ok", None, [chunk("abc foo")])
+    st.close()
+
+
+def test_damage_found_in_a_snapshot_another_writer_moved_past(tmp_path: Path) -> None:
+    """A lookup that finds the FTS index damaged inside a read snapshot, after
+    another connection has committed, reads the chunk text instead of
+    failing on a write the snapshot cannot make; the damage is recorded once
+    the snapshot ends, and fill_fts() makes the table again."""
+    path = tmp_path / "idx.sqlite"
+    one_chunk(path)
+    db = sqlite3.connect(path)
+    db.execute(f"DELETE FROM {store.FTS_TABLE}_data WHERE id>10")
+    db.commit()
+    db.close()
+    a, b = Store(path), Store(path)
+    with a.snapshot():
+        a.db.execute("SELECT count(*) FROM chunks").fetchone()
+        with b.transaction():
+            b.set_meta("other", "1")
+        assert a.exact_chunks("abc") == {1}
+        assert a.exact_chunks("abc", word=True) == {1}
+    assert a.get_meta("fts_reset") == "1"
+    assert a.fill_fts() is True
+    assert a.exact_state() == "ready" and a.get_meta("fts_reset") is None
+    check(a)
+    assert b.exact_chunks("abc") == {1}
+    a.close()
+    b.close()
+
+
+def test_damage_seen_in_a_snapshot_while_another_writes(tmp_path: Path) -> None:
+    """When another connection is still writing as the snapshot ends, the
+    damage is not recorded then; the next fill_fts() finds it."""
+    path = tmp_path / "idx.sqlite"
+    one_chunk(path)
+    db = sqlite3.connect(path)
+    db.execute(f"DELETE FROM {store.FTS_TABLE}_data WHERE id>10")
+    db.commit()
+    db.close()
+    a, b = Store(path), Store(path)
+    with b.transaction():
+        with a.snapshot():
+            assert a.exact_chunks("abc") == {1}
+        b.set_meta("other", "1")
+    assert a.get_meta("fts_reset") is None
+    assert b.fill_fts() is True
+    assert b.get_meta("fts_reset") is None
+    check(b)
+    assert b.exact_chunks("abc") == {1}
+    a.close()
+    b.close()
+
+
+def test_search_in_a_snapshot_while_another_updates(tmp_path: Path) -> None:
+    """Without damage, a commit by another connection changes neither the
+    snapshot's lookups nor the FTS state, for a writable or read-only store."""
+    path = tmp_path / "idx.sqlite"
+    one_chunk(path)
+    for ro in (False, True):
+        a, b = Store(path, readonly=ro), Store(path)
+        before = chunk_ids(b)
+        with a.snapshot():
+            assert a.exact_chunks("abc") == before
+            with b.transaction():
+                b.put_file(f"/n/b{ro}.txt", "text", 1, 1, "t", None, "ok", None, [chunk("abc x")])
+            assert a.exact_chunks("abc", word=True) == before
+        assert a.exact_chunks("abc") == chunk_ids(b) != before
+        assert b.get_meta("fts_reset") is None
+        check(b)
+        a.close()
+        b.close()

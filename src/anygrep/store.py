@@ -341,6 +341,8 @@ class Store:
         self._exact_cache: tuple[tuple, frozenset[int]] | None = None
         self._vec_cache: tuple[tuple, Vectors] | None = None
         self._lock: sqlite3.Connection | bool | None = None
+        self._reading = False  # inside a read transaction of snapshot()
+        self._fts_damage_seen = False  # by a lookup in it, recorded after it
         tables = {
             r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
@@ -497,12 +499,20 @@ class Store:
 
     def _fts_damaged(self) -> None:
         """Record that a read found the FTS index damaged, so that the next
-        update makes it again (lookups read the chunk text until then). A
-        read-only store, or one another process is writing, leaves that to
-        the check of the next fill_fts()."""
+        update makes it again (lookups read the chunk text until then).
+        Inside snapshot() it is recorded when the snapshot ends. A read-only
+        store, or one another process is writing, leaves that to the check
+        of the next fill_fts()."""
         if self.readonly or self.get_meta("fts_reset") is not None:
             return
-        if self.db.in_transaction:
+        if self._reading:
+            # A read snapshot cannot always become a write (another
+            # connection may have committed since it began): this search
+            # reads the chunk text, and snapshot() records it at the end.
+            self._fts_damage_seen = True
+            self.fts = False
+            return
+        if self.db.in_transaction:  # a write transaction (BEGIN IMMEDIATE)
             self.set_meta("fts_reset", "1")
             self.fts = False
             return
@@ -1093,11 +1103,16 @@ class Store:
             yield
             return
         self.db.execute("BEGIN")
+        self._reading = True
         try:
             yield
         finally:
+            self._reading = False
             if self.db.in_transaction:
                 self.db.execute("COMMIT")
+        if self._fts_damage_seen:
+            self._fts_damage_seen = False
+            self._fts_damaged()
 
     def load_matrix(
         self, kinds: Iterable[str] | None = None, prefixes: Iterable[str] | None = None
