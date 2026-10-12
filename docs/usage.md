@@ -366,11 +366,14 @@ it must match none of the excludes.
 
 ## Offline use and mirrors
 
-Everything runs locally and anygrep has no telemetry. The only network access is the one-time model
-download from huggingface.co. It is pinned to a fixed revision and checked against SHA-256 hashes.
+anygrep has no telemetry. Its only network access is the one-time model download from huggingface.co,
+pinned to a fixed revision and checked against SHA-256 hashes.
 
 onnxruntime has its own usage telemetry: the 1.31 Linux build sends it to Microsoft, and the Windows
 build logs it through ETW. anygrep switches it off before loading the model.
+
+The index keeps the text of your files, unencrypted, in one SQLite file (`anygrep status` shows where).
+Treat it like the files themselves when you back up or sync that folder.
 
 - `HF_ENDPOINT` points the download at a mirror.
 - To work fully offline, run `anygrep model --download` once on a connected machine, or copy the files

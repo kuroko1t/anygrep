@@ -75,12 +75,6 @@ See also [how it works](docs/how-it-works.md), [relevance](docs/relevance.md) an
 - No audio, video or Office documents yet (anygrep says how many Office files it skipped), and no
   file watching (run `anygrep index` from cron).
 
-## Privacy
-
-Everything runs locally. The only network access is the one-time model download, checked against hashes
-([offline use](docs/usage.md#offline-use-and-mirrors)), and anygrep has no telemetry. It also switches
-off onnxruntime's own usage telemetry before loading the model.
-
 ## License
 
 MIT. The model is not part of this package. anygrep downloads
