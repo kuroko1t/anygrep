@@ -22,18 +22,20 @@ type_cmd() {
 }
 
 # run COMMAND [COMMENT] [PAUSE]: COMMENT is typed as a shell comment, not run.
+# PAUSE is how long the result stays on screen before the next command.
 run() {
     type_cmd "$1${2:+   # $2}"
     printf '%s' "$START"
     eval "$1"
     printf '%s' "$END"
-    sleep "${3:-1.6}"
+    sleep "${3:-3.5}"
 }
 
 clear
 run "anygrep 'running out of disk space'"
-run "anygrep 'パン生地の発酵時間'" "query in Japanese, English note"
-run "anygrep 'how many vacation days do I get'"
-run "anygrep --image ../query-chart.png -m 1"
-run "anygrep -l 'tax receipts' | head -3" "pipe-friendly: file names only"
-run "anygrep 'qwzx plorb fnord' -m 2; echo \"exit=\$?\"" "nothing relevant: weak results, exit 1" 2.5
+echo
+run "anygrep 'パン生地の発酵時間'" "Japanese query, English note"
+echo
+run "anygrep 'how many vacation days do I get'" "" 0.5
+printf '\033[1;32m$\033[0m '
+sleep 0.5

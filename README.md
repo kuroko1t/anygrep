@@ -10,6 +10,12 @@ local index. Everything stays on your machine; the only download is the model.
 
 ![anygrep demo](demo/anygrep.gif)
 
+The demo searches a folder that was already indexed, and the wait for the model to load is sped up.
+
+An image can be the query too:
+
+![A chart used as the query and the similar chart anygrep finds](demo/image-search.png)
+
 ## Install
 
 ```sh

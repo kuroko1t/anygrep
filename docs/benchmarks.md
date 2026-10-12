@@ -45,8 +45,8 @@ stays usable. `index --background` uses half of the threads at a low priority.
 
 The demo corpus (12 notes, 3 PDFs with 8 pages, 8 images; `scripts/make_demo_corpus.py`) indexes in
 about 13 s with the default 8 threads (17 s with 4), including about 1 s to load the model. The GIF in
-the README shows only searches, recorded with 2 threads on a busy machine; the wait for each result is
-played 6x faster.
+the README shows only searches of the already indexed corpus; the wait for each result is played 6x
+faster. `scripts/record_demo.sh` records it and also draws the image search picture.
 
 Its index file is about 120 KB. Each chunk takes about 1.5 KB plus its text.
 

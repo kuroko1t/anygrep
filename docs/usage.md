@@ -222,6 +222,12 @@ screenshots/error-dialog.png:1:[image]
 collapsed near-duplicates, with the same keys except `rank` and `similar`). `-l` prints each matching file
 once, best first.
 
+```console
+$ anygrep -l 'tax receipts'
+notes/finance/tax-checklist.md
+notes/finance/kakutei-shinkoku.md
+```
+
 Everything that is not a result (notes, hints, progress, errors) goes to stderr.
 
 Piped or redirected output is UTF-8. On Windows it uses the console code page instead, which is what
@@ -253,6 +259,14 @@ and lists the closest three, or `-m` of them (at most 10) when you give `-m`, ma
 status is still 1. Piped output, `-l` and `--json` show weak results only with `--weak` (in `--json`
 with `"weak": true`); otherwise they print nothing and stderr says
 `anygrep: no strong matches (use --weak to see the closest)`.
+
+```console
+$ anygrep 'qwzx plorb fnord' -m 2; echo "exit=$?"
+No strong matches; showing the closest results.
+ 1  0.628  photos/whiteboard.jpg  [image]  (weak)
+ 2  0.615  screenshots/terminal.png  [image]  (weak)
+exit=1
+```
 
 ### Near-duplicates
 
@@ -326,3 +340,5 @@ anygrep "screenshot of an error about disk space" --db ~/anygrep-demo/index.sqli
 
 Generate it outside the clone: anygrep honours `.gitignore`, and the repository ignores generated demo
 files.
+It also writes `query.png`, a chart to try `anygrep --image query.png` with; the folder's
+`.anygrepignore` keeps it out of the index.
