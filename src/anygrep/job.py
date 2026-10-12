@@ -478,8 +478,9 @@ def _end_child(pid: int) -> None:
 
 
 # ---------------------------------------------------------------- stop
-def _take_final(index: Path) -> JobState | None:
-    """The state a stopped worker left with its exact counts (then removed)."""
+def _take_final(index: Path, job_id: str) -> JobState | None:
+    """The state a stopped worker of job `job_id` left with its exact counts
+    (then removed). A file left by another job is removed but not used."""
     path = job_paths(index).final
     try:
         st = JobState.from_json(path.read_text(encoding="utf-8"))
@@ -487,7 +488,7 @@ def _take_final(index: Path) -> JobState | None:
         st = None
     with contextlib.suppress(OSError):
         path.unlink()
-    return st
+    return st if st is not None and st.job_id == job_id else None
 
 
 @dataclass
@@ -547,7 +548,7 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
         end = time.monotonic() + KILL_WAIT
         while pid_running(last.pid) and time.monotonic() < end:
             time.sleep(0.1)
-        return StopResult("stopped", _take_final(index) or last)
+        return StopResult("stopped", _take_final(index, st.job_id) or last)
     if liveness(index, cur) == "alive" and cur.pid <= 0:
         # Still starting: no worker has written its PID yet (the spawn may
         # be slow). Mark the job cancelled, keeping the stop file: its worker
@@ -579,7 +580,7 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
             return StopResult("failed", cur)
     with job_mutex(index):
         clear_state(index)
-    return StopResult("stopped", _take_final(index) or last)
+    return StopResult("stopped", _take_final(index, st.job_id) or last)
 
 
 # ---------------------------------------------------------------- worker

@@ -613,3 +613,37 @@ def test_process_start_does_not_depend_on_the_time_zone(monkeypatch) -> None:
     assert job.process_start(os.getpid()) == tokyo
     monkeypatch.setenv("TZ", "America/Los_Angeles")
     assert job.process_start(os.getpid()) == tokyo
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="uses a POSIX sleep child")
+def test_stop_ignores_a_final_file_left_by_another_job(tmp_path):
+    # A final file from an earlier job must not be reported as this job's
+    # counts when the live worker has to be killed.
+    from anygrep.store import acquire_writer_lock
+
+    index = tmp_path / "idx.db"
+    lock = acquire_writer_lock(index)
+    child = subprocess.Popen(["sleep", "60"])
+    job._children[child.pid] = child
+    try:
+        old = job.JobState(started_at=time.time(), log="x", job_id="A", files_done=999)
+        job.job_paths(index).final.write_text(old.to_json())
+        cur = job.JobState(
+            started_at=time.time(),
+            log="x",
+            job_id="B",
+            pid=child.pid,
+            pid_start=job.process_start(child.pid) or "",
+            phase="text",
+            files_done=3,
+        )
+        job.write_state(index, cur)
+        res = job.stop(index, timeout=1)
+        assert res.result == "stopped"
+        assert res.state is not None and res.state.job_id == "B"
+        assert not job.job_paths(index).final.exists()
+    finally:
+        with contextlib.suppress(OSError):
+            child.kill()
+        child.wait()
+        lock.close()
