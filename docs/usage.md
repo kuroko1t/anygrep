@@ -293,9 +293,14 @@ words (`budget` in `budgeting`). Two limits keep common words from flooding the 
   words, so it matches "run_script" and "run-script", and so do Chinese, Japanese and Korean
   characters, which are written without spaces next to Latin words ("runを実行"). Text is folded
   first, so full-width "ＲＵＮ" counts as `run`. File names follow the same rule.
-- A string found in more than 10 of the files searched, and in more than 5% of them, is no clue to a
-  particular file. Such a query (`the`, `and`, a word every note uses) gets no exact matches and is
-  searched by meaning only.
+- A query of plain words (letters, spaces and apostrophes only) found in more than 10 of the files
+  searched, and in more than 5% of them, is no clue to a particular file. Such a query (`the`,
+  `and`, a word every note uses) gets no exact matches and is searched by meaning only. In a scope
+  of 3 or more files, the same goes for plain words found in more than half of them (`the` in a
+  folder of five notes).
+- A query with a digit or any other character, such as an ID, an error code or a file name
+  (`INV-2026-0412`, `e-Tax`, `report.pdf`), is always matched, however many files contain it: the
+  same order number in 12 related files still tells them from the rest.
 
 Shorter queries (1 or 2 characters, which includes many Japanese words such as `税金`) are searched by
 meaning only. Text inside an image is not matched unless it is in the file name. Searching an image

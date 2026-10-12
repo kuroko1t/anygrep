@@ -34,7 +34,7 @@ The design decisions behind these steps are in [DESIGN.md](DESIGN.md) (in Japane
    A text query of 3 or more characters is also looked up as a plain string in the chunk text (an
    SQLite FTS5 trigram index, kept in the same transactions as the chunks) and in the file names; files
    that contain it come first, marked as exact, whatever their score. Short words match whole words
-   only, and a string found in many of the files searched does not count.
+   only, and a plain word found in many of the files searched does not count (an ID always does).
 
 The image preprocessing is a small numpy port of the reference processor. It matches the reference
 implementation's embeddings with a cosine similarity of at least 0.9999.

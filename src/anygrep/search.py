@@ -248,12 +248,19 @@ _EXACT_BOOST = 10.0
 # A query of 3 or 4 ASCII letters matches only whole words: "run" not in
 # "truncates", "pip" not in "pipeline".
 _SHORT_WORD = re.compile(r"[a-z]{3,4}")
-# A string found in more files than this is no clue to a particular file
-# ("the", "and", a folder's common word): the query then has no exact
-# matches and is searched by meaning only. The limit is the larger of the
-# count and the share of the files searched.
+# A query of plain words (letters and spaces only) found in more files than
+# this is no clue to a particular file ("the", "and", a folder's common
+# word): the query then has no exact matches and is searched by meaning
+# only. The limit is the larger of the count and the share of the files
+# searched. In a scope of at least EXACT_COMMON_MIN_FILES files, a plain
+# word found in more than EXACT_MAX_COMMON of them is also no clue ("the" in
+# all 5 notes of a folder). A query with a digit or any other character
+# (an invoice number, an error code, a file name) is always matched: the
+# same ID in many related files still tells them from the rest.
 EXACT_MAX_FILES = 10
 EXACT_MAX_SHARE = 0.05
+EXACT_MAX_COMMON = 0.5
+EXACT_COMMON_MIN_FILES = 3
 # A weak result counts as just below the cutoff (Hit.near) when its score
 # is less than this under the score it needs.
 NEAR_MARGIN = 0.02
@@ -268,6 +275,22 @@ def exact_needle(query: str | None) -> str | None:
     return q if len(q) >= EXACT_MIN_CHARS else None
 
 
+def is_plain_words(needle: str) -> bool:
+    """True for a query of letters (any script), spaces and apostrophes
+    only: a word or phrase, not an ID, a number or a file name."""
+    return all(c.isalpha() or c.isspace() or c in "'\u2019" for c in needle)
+
+
+def too_common(needle: str, matched: int, searched: int) -> bool:
+    """Whether a needle found in `matched` of the `searched` files gives no
+    exact matches (see EXACT_MAX_FILES)."""
+    if not is_plain_words(needle):
+        return False
+    if matched > max(EXACT_MAX_FILES, EXACT_MAX_SHARE * searched):
+        return True
+    return searched >= EXACT_COMMON_MIN_FILES and matched > EXACT_MAX_COMMON * searched
+
+
 def _exact_rows(
     store: Store,
     needle: str,
@@ -278,8 +301,8 @@ def _exact_rows(
 ) -> np.ndarray:
     """Rows to rank as exact matches: per file the best chunk containing the
     needle, or its best chunk when only its file name does (with per_file
-    false, every chunk containing it). None of them when the needle is in
-    too many of the files searched."""
+    false, every chunk containing it). None of them when the needle is a
+    plain word found in too many of the files searched (too_common())."""
     rows = np.zeros(len(v.ids), bool)
     word = _SHORT_WORD.fullmatch(needle) is not None
     ids = store.exact_chunks(needle, word=word)
@@ -300,8 +323,7 @@ def _exact_rows(
     )
     with_text = np.zeros(len(v.paths), bool)
     with_text[v.file_of[text_rows]] = True
-    matched = int((with_text | by_name).sum())
-    if matched > max(EXACT_MAX_FILES, EXACT_MAX_SHARE * int(file_ok.sum())):
+    if too_common(needle, int((with_text | by_name).sum()), int(file_ok.sum())):
         return rows
     cand = np.flatnonzero(text_rows | (by_name & ~with_text)[v.file_of])
     if len(cand) == 0:

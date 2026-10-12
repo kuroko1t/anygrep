@@ -326,6 +326,50 @@ def test_short_words_and_common_strings(tmp_path: Path, corpus: Path, fake_embed
     assert exact("zebra1") == ["common1.txt", "common10.txt", "common11.txt"]
 
 
+def test_ids_are_always_matched_common_words_are_not(
+    tmp_path: Path, corpus: Path, fake_embedder
+) -> None:
+    """A query with a digit or a symbol is matched however many files have
+    it; plain words are not when they are in too many of the files searched,
+    which in a small scope means most of them."""
+    shared = [f"inv{i}.txt" for i in range(12)]
+    for name in shared:
+        (corpus / name).write_text(f"Invoice INV-2026-0412 copy {name}.\n")
+    for i in range(30):
+        (corpus / f"other{i}.txt").write_text(f"Unrelated note {i} about zebras.\n")
+    small = corpus / "small"
+    small.mkdir()
+    for i in range(5):
+        (small / f"s{i}.txt").write_text(f"The note {i} with code Q-77{i} and the end.\n")
+    (small / "s0.txt").write_text("The kayak and the paddle, code Q-770.\n")
+    (small / "s1.txt").write_text("The kayak trip and the lake, code Q-771.\n")
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, corpus, fake_embedder)
+
+    def exact(q: str, *where: Path) -> list[str]:
+        scope = scope_matcher([str(p) for p in where], []) if where else None
+        hits = query(st, fake_embedder, q, n=100, hide_weak=False, scope=scope)
+        return sorted(Path(h.path).name for h in hits if h.exact)
+
+    # The same ID in 12 related files (more than 10): all of them.
+    assert exact("INV-2026-0412") == sorted(shared)
+    assert exact("inv-2026") == sorted(shared)
+    # A plain word in 30 files: none.
+    assert exact("zebras") == []
+    # "the" in all 5 files of a small folder: none; an ID there: its file.
+    assert exact("the", small) == []
+    assert exact("Q-773", small) == ["s3.txt"]
+    # A plain word in 2 of 5 files is a clue, in 3 of 5 it is not.
+    assert exact("kayak", small) == ["s0.txt", "s1.txt"]
+    assert exact("note", small) == []
+    # One file searched: its words count, also common ones.
+    assert exact("the", small / "s2.txt") == ["s2.txt"]
+    assert exact("the", small / "s2.txt", small / "s3.txt") == ["s2.txt", "s3.txt"]
+    assert search_mod.is_plain_words("don't stop")
+    for q in ("e-tax", "v2.14.3", "report.pdf", "6,850 kwh", "a_b"):
+        assert not search_mod.is_plain_words(q), q
+
+
 WORD_CASES = {
     # text or file name stem: whether "run" matches it as a whole word
     "run": True,
