@@ -288,7 +288,11 @@ match, not a regular expression, and the whole query must appear as typed (`tax 
 words (`budget` in `budgeting`). Two limits keep common words from flooding the results:
 
 - A query of 3 or 4 ASCII letters matches only whole words: `run` finds "run the script" but not
-  "truncates", and `pip` does not match "pipeline".
+  "truncates", and `pip` does not match "pipeline". A letter or digit of any script continues the
+  word, so `run` does not match "runé", "érun" or "run2". The underscore and the hyphen separate
+  words, so it matches "run_script" and "run-script", and so do Chinese, Japanese and Korean
+  characters, which are written without spaces next to Latin words ("runを実行"). Text is folded
+  first, so full-width "ＲＵＮ" counts as `run`. File names follow the same rule.
 - A string found in more than 10 of the files searched, and in more than 5% of them, is no clue to a
   particular file. Such a query (`the`, `and`, a word every note uses) gets no exact matches and is
   searched by meaning only.

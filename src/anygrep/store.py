@@ -97,10 +97,24 @@ def _sql_fold(text: str | None) -> str | None:
     return None if text is None else fold(text)
 
 
+# What continues a word around a short query (word_pattern()): a letter or
+# digit of any script, or a combining mark, except Chinese, Japanese and
+# Korean characters, which are written without spaces next to Latin words
+# ("runを実行"). The underscore and the hyphen separate words, as in file
+# names ("run_script.sh", "run-script").
+_CJK = (
+    "\u3005\u3006\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
+    "\uac00-\ud7af\U00020000-\U0003134f"
+)
+_WORD_CHAR = rf"(?:[^\W_{_CJK}]|[\u0300-\u036f])"
+
+
 def word_pattern(needle: str) -> re.Pattern[str]:
-    """Matches `needle` (folded) as a whole word: not next to an ASCII
-    letter or digit."""
-    return re.compile(rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])")
+    """Matches `needle` (folded) as a whole word: not next to a letter,
+    digit or combining mark of any script other than Chinese, Japanese or
+    Korean. "run" matches "run_script", "run-script" and "runを", not
+    "runé", "érun" or "run2"."""
+    return re.compile(rf"(?<!{_WORD_CHAR}){re.escape(needle)}(?!{_WORD_CHAR})")
 
 
 def _fts_query(needle: str) -> str:

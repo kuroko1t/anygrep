@@ -18,7 +18,8 @@ All notable changes to anygrep are listed here. The format follows
   indexed text and the file names, ignoring case and Unicode width (NFKC), so an invoice number, an
   error code or a file name finds the file that contains it. Those files always come first, best score
   first, even below the relevance cutoff, marked `(exact)` on a terminal, `"exact": true` in `--json`
-  and `Hit.exact` in the Python API. Queries of 3 or 4 ASCII letters match whole words only, and a
+  and `Hit.exact` in the Python API. Queries of 3 or 4 ASCII letters match whole words only (a letter or digit of
+  any script continues a word; `_`, `-` and Chinese, Japanese or Korean characters do not), and a
   string found in more than 10 of the files searched (and more than 5% of them) gives no exact matches.
   It uses an SQLite FTS5 trigram index (SQLite 3.34 or later; without it searches use meaning only and
   `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;

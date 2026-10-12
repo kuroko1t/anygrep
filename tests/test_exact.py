@@ -326,6 +326,51 @@ def test_short_words_and_common_strings(tmp_path: Path, corpus: Path, fake_embed
     assert exact("zebra1") == ["common1.txt", "common10.txt", "common11.txt"]
 
 
+WORD_CASES = {
+    # text or file name stem: whether "run" matches it as a whole word
+    "run": True,
+    "runé": False,
+    "érun": False,
+    "run2": False,
+    "truncates": False,
+    "run_script": True,
+    "run-script": True,
+    "(run)": True,
+    "runを実行": True,
+    "実行run": True,
+    "ＲＵＮする": True,  # full width, NFKC folds it to "run"
+    "ｒｕｎｅ": False,  # full-width "rune"
+    "run\u0301": False,  # n with a combining accent (composed to "ń")
+}
+
+
+def test_word_pattern_rules() -> None:
+    pat = store.word_pattern("run")
+    for text, want in WORD_CASES.items():
+        assert (pat.search(store.fold(text)) is not None) is want, text
+
+
+@pytest.mark.parametrize("where", ["text", "name"])
+def test_short_words_whole_word_in_text_and_names(
+    tmp_path: Path, corpus: Path, fake_embedder, where: str
+) -> None:
+    """The same whole-word rule applies to the text and to file names."""
+    want = set()
+    for i, (stem, ok) in enumerate(WORD_CASES.items()):
+        name = f"t{i}.txt" if where == "text" else f"{stem}.txt"
+        body = f"Line {stem} here.\n" if where == "text" else f"Other words {i}.\n"
+        (corpus / name).write_text(body, encoding="utf-8")
+        if ok:
+            want.add(unicodedata.normalize("NFC", name))
+    for i in range(10):
+        (corpus / f"filler{i}.txt").write_text(f"Nothing to see {i}.\n")
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, corpus, fake_embedder)
+    hits = query(st, fake_embedder, "run", n=100, hide_weak=False)
+    got = {unicodedata.normalize("NFC", Path(h.path).name) for h in hits if h.exact}
+    assert got == want
+
+
 def test_query_syntax_is_literal(tmp_path: Path, corpus: Path, fake_embedder) -> None:
     (corpus / "q.txt").write_text('He said "stop" (NOT now) AND left; 50% of a_b OR c*d; x"y\n')
     st = Store(tmp_path / "idx.sqlite")
