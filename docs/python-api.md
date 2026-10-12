@@ -85,7 +85,7 @@ Only one process changes an index at a time. When another one does, for example 
 started with `anygrep index --background`, `update()` raises `IndexBusyError` at once. Searching works
 meanwhile.
 
-The first call that needs the model downloads it (about 540 MB) without any output. Run
+The first call that needs the model downloads it (about 350 MB, or 540 MB with images) without any output. Run
 `anygrep model --download` beforehand to see the progress, or set `ANYGREP_OFFLINE=1` to make sure
 nothing is downloaded.
 
