@@ -49,6 +49,11 @@ files.
 `update_pending` is `True` when some indexed files were processed by an older version of anygrep, one
 whose text extraction, chunking or image handling has since changed. They are still searched as they
 are, and the next `update()` indexes them again (resumably, like changed files).
+`update_pending` says only that: `False` means no file from an older processing generation is left,
+not that the index is complete or up to date. Files added, changed or deleted since the last
+`update()`, files that failed or were skipped, and a file whose indexing was interrupted part way
+(it is finished by the next `update()`) do not make it `True`. Call `update()` to bring the index up
+to date.
 
 ## `Index.update(paths=None, *, image_tokens=None, images=True, extensions=(), progress=None)`
 
