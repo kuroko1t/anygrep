@@ -71,4 +71,4 @@ jobs:
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "anygrep $GITHUB_REF_NAME" --notes "See CHANGELOG.md for the changes in this release."
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "anygrep $GITHUB_REF_NAME" --notes "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/CHANGELOG.md) for the changes in this release."
