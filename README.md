@@ -28,7 +28,7 @@ Windows on ARM and uninstalling.
 ```sh
 anygrep "wifi password reset"                 # search here (new files are indexed first)
 anygrep "when is the tax return due" ~/notes  # search one folder
-anygrep --image whiteboard.jpg ~/Pictures     # find similar pictures
+anygrep --image whiteboard.jpg ~/Screenshots  # find similar pictures
 anygrep -l "invoice from acme"                # file names only; piped output is path:line:text
 anygrep -Q ~/notes                            # interactive: the model stays loaded
 anygrep index --background ~/Pictures         # big folder: index in a low-priority process
@@ -72,7 +72,6 @@ See also [how it works](docs/how-it-works.md), [relevance](docs/relevance.md) an
 ## Limitations
 
 - No OCR: small text inside images is often missed, and scanned PDFs are skipped.
-- Image indexing is slow on a CPU. This won't replace a photo library.
 - No audio, video or Office documents yet (anygrep says how many Office files it skipped), and no
   file watching (run `anygrep index` from cron).
 
