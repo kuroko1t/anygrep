@@ -1006,3 +1006,27 @@ def test_index_exits_2_when_a_file_failed(env, corpus: Path, capsys) -> None:
     (corpus / "broken2.png").unlink()
     code, _, err = run(capsys, "index", str(corpus))
     assert code == 0 and "failed" not in err
+
+
+def test_hidden_weak_results_are_counted(env, notes: Path, cutoff, capsys, tty) -> None:
+    """On a terminal, a line at the end says how many weak results --weak
+    would add; other output and the exit status do not change."""
+    index(capsys, notes)
+    rows = jsonl(run(capsys, "bread", str(notes), "--json", "--weak")[1])
+    n_weak = sum(r["weak"] for r in rows)
+    assert n_weak > 1 and any(not r["weak"] for r in rows)
+    code, out, _ = run(capsys, "bread", str(notes), "--json")
+    assert code == 0 and "weaker match" not in out
+    code, out, _ = run(capsys, "bread", str(notes))
+    assert code == 0 and "weaker match" not in out  # piped: grep format only
+    tty()
+    code, out, _ = run(capsys, "bread", str(notes))
+    assert code == 0
+    assert out.splitlines()[-1] == f"{n_weak} weaker matches hidden (--weak shows them)"
+    assert out.count("weaker match") == 1
+    code, out, _ = run(capsys, "bread", str(notes), "--weak")
+    assert code == 0 and "weaker match" not in out
+    code, out, _ = run(capsys, "bread", str(notes), "-m", "1")
+    assert "weaker match" not in out  # nothing weak in the top 1
+    code, out, _ = run(capsys, NONSENSE, str(notes))
+    assert code == 1 and "weaker match" not in out  # the closest results are shown instead

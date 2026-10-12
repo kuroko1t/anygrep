@@ -254,7 +254,9 @@ file is tried again only when it changes, but it counts on every run until then 
 
 Search hides results whose score is below the cutoff for their type (see [relevance.md](relevance.md)).
 `--weak` shows them too, marked `(weak)`, and then they count as matches for the exit status. On a
-terminal, when nothing passes the cutoff, anygrep says "No strong matches; showing the closest results"
+terminal, when some results pass the cutoff and some weaker ones within `-m` were left out, the list
+ends with a dim line such as `3 weaker matches hidden (--weak shows them)`, so a file just below the
+cutoff is not taken for missing. When nothing passes the cutoff, anygrep says "No strong matches; showing the closest results"
 and lists the closest three, or `-m` of them (at most 10) when you give `-m`, marked as weak; the exit
 status is still 1. Piped output, `-l` and `--json` show weak results only with `--weak` (in `--json`
 with `"weak": true`); otherwise they print nothing and stderr says

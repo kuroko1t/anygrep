@@ -689,8 +689,11 @@ GREP_SNIPPET_COLS = 200
 JSON_SNIPPET_COLS = 240
 
 
-def _print_human(hits, query: str | None, color: bool, fallback: bool = False) -> None:
-    """The terminal view: rank, score, location and a snippet per result."""
+def _print_human(
+    hits, query: str | None, color: bool, fallback: bool = False, hidden: int = 0
+) -> None:
+    """The terminal view: rank, score, location and a snippet per result.
+    `hidden`: weak results left out that --weak would show."""
     from .search import snippet
 
     width = 160
@@ -722,6 +725,9 @@ def _print_human(hits, query: str | None, color: bool, fallback: bool = False) -
             more = len(h.similar) - len(names)
             note = f"(+{len(h.similar)} similar: {', '.join(names)}{', ...' if more else ''})"
             print("      " + _style(note, "2", color))
+    if hidden:
+        matches = "weaker matches" if hidden != 1 else "weaker match"
+        print(_style(f"{hidden} {matches} hidden (--weak shows them)", "2", color))
 
 
 def _grep_line(h, query: str | None, color: bool) -> str:
@@ -1245,12 +1251,17 @@ def _search(args, store) -> int:
         hits = find(n, hide_weak=not args.weak)
         if mode == "human":
             fallback = False
+            hidden = 0
             if not hits and not args.weak:
                 # Nothing passes the cutoff: show the closest few, marked as weak.
                 few = WEAK_FALLBACK if args.max_count is None else min(n, WEAK_FALLBACK_MAX)
                 hits = find(few, hide_weak=False)
                 fallback = bool(hits)
-            _print_human(hits, query_text, color, fallback)
+            elif not args.weak:
+                # Say how many weak results --weak would add, so a file that is
+                # just below the cutoff is not taken for missing.
+                hidden = sum(h.weak for h in find(n, hide_weak=False))
+            _print_human(hits, query_text, color, fallback, hidden)
         elif mode != "quiet":
             if not hits:
                 _err(NO_STRONG_PIPE)

@@ -21,6 +21,8 @@ All notable changes to anygrep are listed here. The format follows
   It uses an SQLite FTS5 trigram index (SQLite 3.34 or later; without it searches use meaning only and
   `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;
   the index file grows by about the size of the text it holds (47% in a test with 2,000 notes).
+- On a terminal, a search that hid weak results ends with one dim line such as `3 weaker matches
+  hidden (--weak shows them)`. Piped output, `-l`, `--json` and the exit status do not change.
 
 ### Changed
 
