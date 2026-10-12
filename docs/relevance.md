@@ -93,16 +93,19 @@ The rule used before this one, a margin above the median score of the indexed ch
 
 ## Near-duplicates
 
-Near-duplicate files are shown once (see [usage.md](usage.md#near-duplicates)). They are found from the
-embeddings, which see layout and topic more than small details:
+Near-duplicate files are shown once (see [usage.md](usage.md#near-duplicates)). Exact copies are found
+by their content hash. Edited copies of notes and PDFs are found from the embeddings, which see layout
+and topic more than small details, together with the words:
 
-- Two versions of a chart that differ only in a few bar heights are collapsed.
-- A note with a new paragraph, or a tiny thumbnail of a screenshot, can stay separate.
+- Images are grouped only when their bytes are the same. The embeddings cannot tell a resized copy of a
+  chart from a chart whose bar heights differ (cosine 0.999 for both), and the different numbers may be
+  what you are looking for, so a resized or recompressed copy is listed as a result of its own.
+- A note with a new paragraph can stay separate.
 - Text and PDF files must also share almost all their words, so short monthly payslips or statements
   from one template stay separate. In a long template where only a few amounts and the month change
   (a 15-line payslip, say), about 90 percent of the words can be the same, as in an edited copy (the
   rule allows up to 18 percent changed word pairs, about 10 percent replaced words), and the months
-  are collapsed into one result with a `(+N similar: ...)` note. Images have no such check.
+  are collapsed into one result with a `(+N similar: ...)` note.
 - Piped output (`PATH:LINE:SNIPPET`) and `-l` never collapse: they list every matching file.
 
 The rule and its measurements are in `scripts/measure_duplicates.py`,

@@ -24,6 +24,10 @@ All notable changes to anygrep are listed here. The format follows
 
 ### Changed
 
+- Images are grouped as near-duplicates only when they are exact copies (the same bytes). Before, images
+  whose embeddings were almost the same were grouped too, which also hid charts or statements whose
+  numbers differ. A resized or recompressed copy of a picture is now listed as a result of its own.
+  Notes and PDFs are grouped as before.
 - `anygrep index` exits with status 2 while a file under its PATHs has failed to index (it still
   indexes the rest and prints the summary). That includes a file that failed in an earlier run and
   was not tried again because it has not changed; the summary counts it as "still failed from an

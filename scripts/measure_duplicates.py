@@ -332,7 +332,9 @@ def main() -> int:
     ]
 
     def merges(p: dict) -> bool:
-        t = DUP_MIN_COSINE[p["type"]]
+        t = DUP_MIN_COSINE.get(p["type"])
+        if t is None:  # images: the same bytes only
+            return p["same_sha"]
         words_ok = p["changed"] is None or p["changed"] <= DUP_MAX_CHANGED
         return p["same_sha"] or (min(p["mean_cos"], p["max_chunk_cos"]) >= t and words_ok)
 

@@ -147,8 +147,11 @@ def _prefix_matcher(path: str) -> Callable[[str], bool]:
 # Two files are near-duplicates when they have the same type and either the
 # same SHA-256, or both the cosine between their best-matching chunks and the
 # cosine between their mean chunk vectors reach the value for their type.
-# Calibrated with scripts/measure_duplicates.py (docs/DESIGN.md).
-DUP_MIN_COSINE = {"text": 0.95, "pdf": 0.95, "image": 0.98}
+# Calibrated with scripts/measure_duplicates.py (docs/DESIGN.md). Images are
+# grouped only when their bytes are the same: two charts or screenshots that
+# differ in a few numbers embed almost identically (cosine 0.999), and those
+# numbers are often why one of them is searched for.
+DUP_MIN_COSINE = {"text": 0.95, "pdf": 0.95}
 # Text and PDF files must also have almost the same words: at most this share
 # of the word pairs of one may be missing from the other (see signature.py;
 # added or removed lines do not count). Monthly payslips or bank statements

@@ -1,8 +1,7 @@
 {
  "rule": {
   "text": 0.95,
-  "pdf": 0.95,
-  "image": 0.98
+  "pdf": 0.95
  },
  "max_changed": 0.18,
  "copies": [
@@ -447,22 +446,20 @@
   }
  },
  "copies_not_merged": [
+  "copies/shots/error-dialog-small.png",
+  "copies/shots/terminal.jpg",
+  "copies/photos/sunset-cropped.jpg",
+  "copies/photos/whiteboard-edit.jpg",
+  "copies/shots/weather-thumb.png",
   "copies/shots/login-flow-thumb.jpg",
+  "copies/photos/red-bicycle-crop.jpg",
+  "copies/photos/receipt-q40.jpg",
   "copies/reading/habits-extended.md"
  ],
- "other_pairs_merged": [
-  [
-   "base/screenshots/electricity-usage.png",
-   "related/images/electricity-usage-2025.png"
-  ],
-  [
-   "copies/shots/chart.png",
-   "related/images/electricity-usage-2025.png"
-  ]
- ],
+ "other_pairs_merged": [],
  "search_ms": {
-  "plain": 0.72,
-  "collapse": 2.19
+  "plain": 0.36,
+  "collapse": 1.05
  },
  "groups": [
   {
@@ -500,7 +497,7 @@
     "copies/jp/kakutei-shinkoku-memo.md",
     "base/notes/finance/kakutei-shinkoku.md"
    ],
-   "queries": 6
+   "queries": 5
   },
   {
    "members": [
@@ -511,38 +508,10 @@
   },
   {
    "members": [
-    "copies/photos/whiteboard-edit.jpg",
-    "base/photos/whiteboard.jpg"
-   ],
-   "queries": 16
-  },
-  {
-   "members": [
-    "copies/photos/receipt-q40.jpg",
-    "heldout-mixed/images/receipt.jpg"
-   ],
-   "queries": 3
-  },
-  {
-   "members": [
     "copies/drafts/2026-03-budget-v2.md",
     "base/notes/meetings/2026-03-budget.md"
    ],
    "queries": 7
-  },
-  {
-   "members": [
-    "copies/shots/error-dialog-small.png",
-    "base/screenshots/error-dialog.png"
-   ],
-   "queries": 9
-  },
-  {
-   "members": [
-    "base/screenshots/error-dialog.png",
-    "copies/shots/error-dialog-small.png"
-   ],
-   "queries": 6
   },
   {
    "members": [
@@ -561,20 +530,6 @@
   },
   {
    "members": [
-    "base/screenshots/terminal.png",
-    "copies/shots/terminal.jpg"
-   ],
-   "queries": 5
-  },
-  {
-   "members": [
-    "copies/photos/red-bicycle-crop.jpg",
-    "base/photos/red-bicycle.jpg"
-   ],
-   "queries": 2
-  },
-  {
-   "members": [
     "base/notes/finance/tax-checklist.md",
     "copies/old/tax-checklist-2025.md"
    ],
@@ -589,61 +544,10 @@
   },
   {
    "members": [
-    "base/photos/red-bicycle.jpg",
-    "copies/photos/red-bicycle-crop.jpg"
-   ],
-   "queries": 11
-  },
-  {
-   "members": [
-    "heldout-mixed/images/weather-app.png",
-    "copies/shots/weather-thumb.png"
-   ],
-   "queries": 2
-  },
-  {
-   "members": [
-    "copies/shots/terminal.jpg",
-    "base/screenshots/terminal.png"
-   ],
-   "queries": 2
-  },
-  {
-   "members": [
-    "heldout-mixed/images/receipt.jpg",
-    "copies/photos/receipt-q40.jpg"
-   ],
-   "queries": 4
-  },
-  {
-   "members": [
-    "related/images/electricity-usage-2025.png",
-    "base/screenshots/electricity-usage.png",
-    "copies/shots/chart.png"
-   ],
-   "queries": 4
-  },
-  {
-   "members": [
-    "base/screenshots/electricity-usage.png",
     "copies/shots/chart.png",
-    "related/images/electricity-usage-2025.png"
+    "base/screenshots/electricity-usage.png"
    ],
-   "queries": 5
-  },
-  {
-   "members": [
-    "base/photos/sunset-beach.jpg",
-    "copies/photos/sunset-cropped.jpg"
-   ],
-   "queries": 6
-  },
-  {
-   "members": [
-    "copies/shots/weather-thumb.png",
-    "heldout-mixed/images/weather-app.png"
-   ],
-   "queries": 7
+   "queries": 8
   },
   {
    "members": [
@@ -652,14 +556,7 @@
     "copies/docs/home-network-manual-rev2.pdf"
    ],
    "queries": 2
-  },
-  {
-   "members": [
-    "copies/photos/sunset-cropped.jpg",
-    "base/photos/sunset-beach.jpg"
-   ],
-   "queries": 5
   }
  ],
- "wrong_merges": 13
+ "wrong_merges": 0
 }

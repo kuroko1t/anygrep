@@ -54,10 +54,9 @@ def _groups(hits) -> set[frozenset[str]]:
 def test_rule() -> None:
     assert is_near_duplicate("text", "abc", "abc", 0.1, 0.1)  # same hash
     assert not is_near_duplicate("text", None, None, 0.5, 0.5)
-    t = search_mod.DUP_MIN_COSINE["image"]
-    assert is_near_duplicate("image", "a", "b", t, t)
-    assert not is_near_duplicate("image", "a", "b", t, t - 0.01)
-    assert not is_near_duplicate("image", "a", "b", t - 0.01, 1.0)
+    # Images: only the same bytes, however close the vectors.
+    assert is_near_duplicate("image", "a", "a", 0.1, 0.1)
+    assert not is_near_duplicate("image", "a", "b", 1.0, 1.0)
     assert not is_near_duplicate("audio", "a", "b", 1.0, 1.0)  # unknown type: hash only
 
 
@@ -73,18 +72,26 @@ def test_copies_are_collapsed(store: Store, fake_embedder: FakeEmbedder) -> None
     assert {"notes/bread.md", "archive/bread.md", "archive/bread-v2.md"} in groups
     assert {"corpus/bread.pdf"} in groups  # other type
     assert {"notes/cake.md"} in groups  # related, not a copy
-    assert {"corpus/red.png", "archive/red-small.jpg"} in groups
-    assert len(hits) == len(plain) - 3
+    assert {"corpus/red.png"} in groups and {"archive/red-small.jpg"} in groups
+    assert len(hits) == len(plain) - 2
 
 
-def test_resized_image_is_collapsed(store: Store, fake_embedder: FakeEmbedder) -> None:
+def test_only_identical_images_are_collapsed(
+    store: Store, fake_embedder: FakeEmbedder, corpus: Path
+) -> None:
+    """A resized copy (the same vector here) stays a result of its own; a
+    copy with the same bytes is grouped."""
     q = fake_embedder.embed_query("red picture image")
     hits = search(store, q, n=10, kinds=["image"], collapse=True)
     assert _groups(hits) == {
-        frozenset({"corpus/red.png", "archive/red-small.jpg"}),
+        frozenset({"corpus/red.png"}),
+        frozenset({"archive/red-small.jpg"}),
         frozenset({"corpus/blue.jpg"}),
     }
-    assert _rel(hits[1].path) == "corpus/blue.jpg"
+    shutil.copy(corpus / "red.png", corpus / "archive" / "red-copy.png")
+    run_index(store, [corpus], IndexOptions(quiet=True), lambda v: fake_embedder)
+    hits = search(store, q, n=10, kinds=["image"], collapse=True)
+    assert frozenset({"corpus/red.png", "archive/red-copy.png"}) in _groups(hits)
 
 
 def test_collapsing_fills_up_to_n(store: Store, fake_embedder: FakeEmbedder) -> None:
@@ -246,7 +253,7 @@ def test_rule_checks_words_for_text() -> None:
         raise AssertionError("signatures read although the vectors differ")
 
     assert not is_near_duplicate("text", "a", "b", 0.5, 0.5, never)
-    assert is_near_duplicate("image", "a", "b", 1.0, 1.0, never)
+    assert not is_near_duplicate("image", "a", "b", 1.0, 1.0, never)
 
 
 def test_monthly_forms_stay_separate(

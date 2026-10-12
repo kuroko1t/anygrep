@@ -291,10 +291,11 @@ by reading the stored text, which is slower on a large index.
 
 ### Near-duplicates
 
-Near-duplicate files are shown once: exact copies, and files of the same type whose embeddings are almost
-the same (an exported or slightly edited version, the same note in two folders, a resized or recompressed
-screenshot). The best-ranked one is listed with a note, and the next results fill up to `-m` distinct
-ones:
+Near-duplicate files are shown once: exact copies (the same bytes), and notes or PDFs whose embeddings
+and words are almost the same (an exported or slightly edited version, the same note in two folders).
+Images are grouped only when they are exact copies; a resized or cropped screenshot, or a chart with
+other numbers, is a result of its own. The best-ranked one is listed with a note, and the next results
+fill up to `-m` distinct ones:
 
 ```console
 $ anygrep "marketing budget cut"     # in the test corpus of scripts/measure_duplicates.py
