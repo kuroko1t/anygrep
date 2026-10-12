@@ -398,6 +398,14 @@ WORD_CASES = {
     "ＲＵＮする": True,  # full width, NFKC folds it to "run"
     "ｒｕｎｅ": False,  # full-width "rune"
     "run\u0301": False,  # n with a combining accent (composed to "ń")
+    # combining marks of other scripts, which do not compose with "n"
+    "run\u093c": False,  # Devanagari nukta
+    "run\u0e48": False,  # Thai tone mark
+    "run\u064e": False,  # Arabic fatha
+    "run\u20dd": False,  # enclosing circle
+    "\u064erun": False,  # after a mark
+    "\u0e48 run": True,
+    "run \u093c": True,
 }
 
 

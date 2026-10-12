@@ -101,20 +101,46 @@ def _sql_fold(text: str | None) -> str | None:
 # digit of any script, or a combining mark, except Chinese, Japanese and
 # Korean characters, which are written without spaces next to Latin words
 # ("runを実行"). The underscore and the hyphen separate words, as in file
-# names ("run_script.sh", "run-script").
+# names ("run_script.sh", "run-script"). Python's \w leaves out combining
+# marks, and `re` has no class for them, so they are checked after a match.
 _CJK = (
     "\u3005\u3006\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
     "\uac00-\ud7af\U00020000-\U0003134f"
 )
-_WORD_CHAR = rf"(?:[^\W_{_CJK}]|[\u0300-\u036f])"
+_WORD_CHAR = rf"[^\W_{_CJK}]"
 
 
-def word_pattern(needle: str) -> re.Pattern[str]:
+def _is_mark(ch: str) -> bool:
+    return unicodedata.category(ch)[0] == "M"
+
+
+class WordPattern:
+    """`needle` as a whole word, for word_pattern()."""
+
+    __slots__ = ("_rx",)
+
+    def __init__(self, needle: str) -> None:
+        self._rx = re.compile(rf"(?<!{_WORD_CHAR}){re.escape(needle)}(?!{_WORD_CHAR})")
+
+    def search(self, text: str) -> re.Match[str] | None:
+        """The first whole-word match in `text`, or None."""
+        pos = 0
+        while (m := self._rx.search(text, pos)) is not None:
+            start, end = m.span()
+            if not (
+                (start and _is_mark(text[start - 1])) or (end < len(text) and _is_mark(text[end]))
+            ):
+                return m
+            pos = start + 1
+        return None
+
+
+def word_pattern(needle: str) -> WordPattern:
     """Matches `needle` (folded) as a whole word: not next to a letter,
     digit or combining mark of any script other than Chinese, Japanese or
     Korean. "run" matches "run_script", "run-script" and "runを", not
-    "runé", "érun" or "run2"."""
-    return re.compile(rf"(?<!{_WORD_CHAR}){re.escape(needle)}(?!{_WORD_CHAR})")
+    "runé", "érun", "run2" or "run" followed by a Thai tone mark."""
+    return WordPattern(needle)
 
 
 def _fts_query(needle: str) -> str:
