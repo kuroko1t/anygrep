@@ -77,8 +77,7 @@ See also [how it works](docs/how-it-works.md), [relevance](docs/relevance.md) an
 
 ## License
 
-MIT. The model is not part of this package. anygrep downloads
-[an int8 ONNX conversion](https://huggingface.co/onnx-community/embeddinggemma-2-ONNX) of EmbeddingGemma 2,
-which Google releases under the Apache License 2.0. Its model card also refers to the Gemma Prohibited
-Use Policy, and your use of the model is subject to those terms. anygrep is not affiliated with or
-endorsed by Google.
+MIT. The model is downloaded separately:
+[an int8 ONNX conversion](https://huggingface.co/onnx-community/embeddinggemma-2-ONNX) of Google's
+EmbeddingGemma 2, released under the Apache License 2.0 (its model card also points to the Gemma
+Prohibited Use Policy). anygrep is not affiliated with Google.
