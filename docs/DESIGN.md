@@ -31,7 +31,7 @@ English: [how-it-works.md](how-it-works.md), [usage.md](usage.md), [relevance.md
   - `huggingface_hub` は tokenizers の依存として入るだけで、anygrep 自身は使っていない。
 - int8 を選んだ理由（事前ベンチマークより）
   - torch fp32 よりテキストで約 2 倍、画像で約 1.4 倍速い（4 スレッド、アイドル時の推定値）。
-  - fp32 とのコサイン類似度は 0.9986 以上。
+  - fp32 とのコサイン類似度は、画像 60 件で平均 0.9986・最小 0.9884、キャプション 60 件で 1.0000。
   - q4 は短いクエリ 1 件では int8 より速い（38 ms と 97 ms）が、文書と画像では遅く、画像の埋め込みは fp32 からのずれが大きい（コサイン 0.988）。モデルを 1 つにするため int8 にした。
 - 画像の前処理は、transformers の Gemma4ImageProcessor を numpy で移植した。
   - 縦横比を保ったまま、`budget × 9` パッチ以内に収まり、辺が 48px の倍数になるサイズへ bicubic でリサイズする。

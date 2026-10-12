@@ -37,4 +37,4 @@ The design decisions behind these steps are in [DESIGN.md](DESIGN.md) (in Japane
    only, and a plain word found in many of the files searched does not count (an ID always does).
 
 The image preprocessing is a small numpy port of the reference processor. It matches the reference
-implementation's embeddings with a cosine similarity of at least 0.9999.
+implementation's embeddings with a cosine similarity of at least 0.99995.
