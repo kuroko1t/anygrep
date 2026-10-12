@@ -96,6 +96,9 @@ class UpdateResult:
     skipped: int = 0
     failed: int = 0
     seconds: float = 0.0
+    # Files in a common document format anygrep cannot read yet (.docx,
+    # .xlsx, .pptx, .odt, .rtf, .epub and the like) found in the folders.
+    unsupported_documents: int = 0
 
 
 class Index:
@@ -427,6 +430,7 @@ class Index:
             skipped=rep.skipped,
             failed=rep.errors,
             seconds=rep.seconds,
+            unsupported_documents=sum(rep.walk.documents.values()),
         )
 
     def _busy_message(self) -> str:

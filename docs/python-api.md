@@ -73,6 +73,10 @@ is skipped and keeps its entries.
 
 Returns an `UpdateResult` with the counts of files `new`, `updated`, `unchanged`, `removed`, `moved`,
 `skipped` and `failed`, and `seconds`. `anygrep status --problems` lists the skipped and failed files.
+`unsupported_documents` counts the files in a common document format that anygrep cannot read yet
+(`.docx`, `.xlsx`, `.pptx`, `.odt`, `.rtf`, `.epub` and the like; see
+[usage.md](usage.md#skipped-files)) found in the folders scanned, on every call. They are not in
+`skipped`.
 
 Finished files are saved as they go. If the run stops early, because of Ctrl-C or an exception raised
 from `progress`, that exception is raised and the next `update()` continues where it stopped.

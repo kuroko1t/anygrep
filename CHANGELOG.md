@@ -31,6 +31,12 @@ All notable changes to anygrep are listed here. The format follows
   then names the `-m` that shows them, or says "at least" when more may follow. Piped output, `-l`,
   `--json` and the exit status do not change.
 
+- When a run finds new files to index (`anygrep index` or the indexing before a search), it says in
+  one line on stderr how many files in a common document format it skipped (`.docx`, `.xlsx`,
+  `.pptx`, `.odt`, `.rtf`, `.epub` and the like), since those are not supported yet. `-q` leaves it
+  out; stdout and the exit status do not change. The Python API has
+  `UpdateResult.unsupported_documents`.
+
 ### Changed
 
 - The index schema is now 2. An index of schema 1 is read as it is and moved to schema 2 by the first

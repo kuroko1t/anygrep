@@ -362,11 +362,29 @@ def _index_locked(args, store, worker=None):
     )
 
 
+def _documents_note(walk) -> str | None:
+    """One line about skipped files in a common document format (.docx,
+    .xlsx, ...), or None when there were none."""
+    count = sum(walk.documents.values())
+    if not count:
+        return None
+    exts = sorted(walk.documents, key=lambda e: (-walk.documents[e], e))
+    shown = ", ".join(exts[:3]) + (", ..." if len(exts) > 3 else "")
+    noun = "document" if count == 1 else "documents"
+    these = "this format is" if len(exts) == 1 else "these formats are"
+    return f"anygrep: skipped {count:,} Office {noun} ({shown}); {these} not supported yet"
+
+
 def _index_summary(args, rep) -> int:
     """Print what `anygrep index` did; the exit status."""
+    from .walker import DOCUMENT_EXTS
+
     if rep is None:
         return EXIT_ERROR
     for p in rep.walk.unsupported_roots:
+        if p.suffix.lower() in DOCUMENT_EXTS:
+            _err(f"Skipped {p}: {p.suffix.lower()} files are not supported yet.")
+            continue
         _err(
             f"Skipped {p}: unsupported file type"
             + (f" (use --ext {p.suffix} to index it as plain text)." if p.suffix else ".")
@@ -415,6 +433,11 @@ def _index_summary(args, rep) -> int:
             _err(f"  {rep.deferred_images} images not indexed (--no-images).")
         if rep.skipped or rep.errors or rep.still_failed:
             _err(f"  See `{_hint('status')} --problems` for skipped or failed files.")
+        # Only when the run found new files (or nothing to index), not on
+        # every update of a folder whose documents are known to be skipped.
+        docs = _documents_note(rep.walk) if rep.new or rep.scanned == 0 else None
+        if docs:
+            _err(docs)
     if rep.interrupted:
         _err("Interrupted. Finished files are saved; run the same command again to resume.")
         return EXIT_INTERRUPTED
@@ -1103,6 +1126,9 @@ def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int |
     # budget when no progress is shown; the next run continues).
     store.fill_fts(max_seconds=None if visible else args.index_budget, quiet=not visible)
     if not todo:
+        docs = _documents_note(report.walk)
+        if docs and not indexed:  # nothing to search: say why the documents are not
+            note(docs)
         return None
 
     # The estimate decides only whether a run without a visible progress bar
@@ -1154,6 +1180,9 @@ def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int |
             f"anygrep: {rep.errors + rep.skipped:,} files could not be indexed; "
             f"see {_hint('status')} --problems"
         )
+    docs = _documents_note(rep.walk) if rep.new else None
+    if docs:
+        note(docs)
     return None
 
 

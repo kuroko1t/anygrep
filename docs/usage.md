@@ -127,6 +127,13 @@ started while another one runs exits with status 2, and a search searches the in
   repository root. A folder that those rules exclude is still indexed when you name it, with a note.
 - `node_modules`, `__pycache__`, virtualenvs, symlinks, binary files and empty files.
 - Files over the size limits: 20 MB text, 300 MB PDF, 80 MB image.
+- Files of other types, including Office and other document formats that are not supported yet:
+  `.docx .doc .xlsx .xls .pptx .ppt .odt .ods .odp .rtf .epub .pages .numbers .key`. When a run
+  (`anygrep index`, or the indexing before a search) finds new files to index, it also says how many
+  of these documents it skipped, in one line on stderr such as `anygrep: skipped 12 Office documents
+  (.docx, .xlsx); these formats are not supported yet`, so they are not taken for missing from the
+  results. A run with nothing new does not repeat it, `-q` leaves it out, and the results and exit
+  status do not change. Other unsupported files (code, archives, media) are not counted.
 
 Files that cannot be read are recorded and retried after they change. Files that failed because of
 permissions or a model error, for example running out of memory, are retried on every run. Folders that
@@ -380,7 +387,7 @@ build logs it through ETW. anygrep switches it off before loading the model.
 - Each search reloads the model; use `anygrep -Q` for several queries.
 - Search is brute force in memory. It was measured at 100,000 chunks (about 0.4 s per search after the model loads).
 - The relevance cutoff was tuned on small synthetic corpora. Use `--weak` if a result is missing.
-- No audio, video or Office documents.
+- No audio, video or Office documents (`.docx`, `.xlsx`, `.pptx` and the like are skipped with a note).
 - No file watching: run `anygrep index` again, for example from cron.
 
 ## Demo corpus

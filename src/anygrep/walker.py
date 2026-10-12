@@ -36,6 +36,15 @@ SKIP_DIRS = frozenset(
 )
 
 
+# Document formats people expect a search tool to read, which anygrep cannot
+# read yet. Skipped like any unsupported file, but counted
+# (WalkStats.documents) so that a run can say why they are not found.
+DOCUMENT_EXTS = frozenset(
+    {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".odt", ".ods", ".odp", ".rtf", ".epub"}
+    | {".pages", ".numbers", ".key"}
+)
+
+
 @dataclass(frozen=True)
 class FileEntry:
     path: Path  # absolute
@@ -50,6 +59,9 @@ class WalkStats:
     ignored: int = 0
     too_large: int = 0
     unsupported: int = 0
+    # Unsupported files in a common document format (DOCUMENT_EXTS) found
+    # in folders, by extension; files named explicitly are not counted.
+    documents: dict[str, int] = field(default_factory=dict)
     # Folders that could not be listed. Index rows below them are kept.
     unreadable_dirs: list[Path] = field(default_factory=list)
     # Roots whose stat failed with ENOENT; the indexer distinguishes directories
@@ -271,11 +283,15 @@ def walk(
         if deadline is not None and time.perf_counter() > deadline:
             raise WalkTruncated(count, by_time=True)
 
-    def consider(p: Path, st: os.stat_result) -> FileEntry | None:
+    def consider(p: Path, st: os.stat_result, in_folder: bool = True) -> FileEntry | None:
         stats.seen += 1
         kind = kind_of(p, extra_text_exts)
         if kind is None:
             stats.unsupported += 1
+            ext = p.suffix.lower()
+            # "~$name.docx": the lock file Office keeps next to an open document.
+            if in_folder and ext in DOCUMENT_EXTS and not p.name.startswith("~$"):
+                stats.documents[ext] = stats.documents.get(ext, 0) + 1
             return None
         try:
             str(p).encode("utf-8")
@@ -305,7 +321,7 @@ def walk(
         if stat.S_ISREG(st_root.st_mode):
             if root not in seen:
                 seen.add(root)
-                e = consider(root, st_root)
+                e = consider(root, st_root, in_folder=False)
                 if e:
                     yield e
                 elif kind_of(root, extra_text_exts) is None:

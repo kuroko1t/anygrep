@@ -73,7 +73,8 @@ See also [how it works](docs/how-it-works.md), [relevance](docs/relevance.md) an
 
 - No OCR: small text inside images is often missed, and scanned PDFs are skipped.
 - Image indexing is slow on a CPU. This won't replace a photo library.
-- No audio, video or Office documents, and no file watching (run `anygrep index` from cron).
+- No audio, video or Office documents yet (skipped files are counted), and no file watching (run
+  `anygrep index` from cron).
 
 ## Privacy
 
