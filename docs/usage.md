@@ -254,9 +254,9 @@ file is tried again only when it changes, but it counts on every run until then 
 
 Search hides results whose score is below the cutoff for their type (see [relevance.md](relevance.md)).
 `--weak` shows them too, marked `(weak)`, and then they count as matches for the exit status. On a
-terminal, when some results pass the cutoff and some weaker ones within `-m` were left out, the list
-ends with a dim line such as `3 weaker matches hidden (--weak shows them)`, so a file just below the
-cutoff is not taken for missing. When nothing passes the cutoff, anygrep says "No strong matches; showing the closest results"
+terminal, when results within `-m` were left out with a score just under the cutoff (less than 0.02
+below it), the list ends with a dim line such as `2 more results just below the cutoff (--weak shows
+them)`, so such a file is not taken for missing. Results further below are not counted. When nothing passes the cutoff, anygrep says "No strong matches; showing the closest results"
 and lists the closest three, or `-m` of them (at most 10) when you give `-m`, marked as weak; the exit
 status is still 1. Piped output, `-l` and `--json` show weak results only with `--weak` (in `--json`
 with `"weak": true`); otherwise they print nothing and stderr says
@@ -272,24 +272,38 @@ exit=1
 
 ### Exact matches
 
-A text query of 3 or more characters is also looked up as a plain string, ignoring case, in the indexed
-text and in the file paths (relative to the searched folder, or to the indexed folder with
-`--everywhere`). Files that contain it are always listed, even when their score is below the cutoff,
-and come before all other results, best score first. On a terminal they are marked `(exact)`, in
-`--json` they have `"exact": true`, and the piped format and `-l` simply list them first. They count as
-matches for the exit status. PATHs, `-g`, `-t` and `-m` apply to them as to any result.
+A text query of 3 or more characters is also looked up as a plain string in the indexed text and in
+the file names (the name only, not the folders above it). Case is ignored for every script, and text is
+compared in Unicode NFKC form, so full-width letters and digits match plain ones (`ＡＢＣ１２３` matches
+`abc123`) and accents match however they are encoded. Files that contain it are always listed, even when
+their score is below the cutoff, and come before all other results, best score first. On a terminal they
+are marked `(exact)`, in `--json` they have `"exact": true` (and `"weak": false`, whatever the score),
+and the piped format and `-l` simply list them first. They count as matches for the exit status. PATHs,
+`-g`, `-t` and `-m` apply to them as to any result.
 
 This is for things that have no meaning to match, such as an invoice number, an error code, a part
 number or a file name: `anygrep INV-20391` finds the one note that mentions it. It is a substring
 match, not a regular expression, and the whole query must appear as typed (`tax return` does not match
-`tax\nreturn` across a line break). Shorter queries are searched by meaning only. Searching an image
+`tax\nreturn` across a line break). Because it is a substring match, a longer query also matches inside
+words (`budget` in `budgeting`). Two limits keep common words from flooding the results:
+
+- A query of 3 or 4 ASCII letters matches only whole words: `run` finds "run the script" but not
+  "truncates", and `pip` does not match "pipeline".
+- A string found in more than 10 of the files searched, and in more than 5% of them, is no clue to a
+  particular file. Such a query (`the`, `and`, a word every note uses) gets no exact matches and is
+  searched by meaning only.
+
+Shorter queries (1 or 2 characters, which includes many Japanese words such as `税金`) are searched by
+meaning only. Text inside an image is not matched unless it is in the file name. Searching an image
 never matches exactly.
 
 Exact matching uses SQLite's FTS5 full-text index with the trigram tokenizer, which needs SQLite 3.34 or
 later (Python's own `sqlite3` module has had it for years on most systems). Without it anygrep searches
 by meaning only, and `anygrep status` says so. An index made by an earlier version of anygrep gets the
 full-text table on the next `anygrep index` or search that indexes; until then, exact matches are found
-by reading the stored text, which is slower on a large index.
+by reading the stored text, which is slower on a large index. Once this version has written to an
+index, anygrep 0.2 and earlier refuse it ("created by a newer anygrep"), because they would change it
+without keeping the full-text table.
 
 ### Near-duplicates
 

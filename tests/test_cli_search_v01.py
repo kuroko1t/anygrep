@@ -16,11 +16,11 @@ from pathlib import Path, PureWindowsPath
 import pytest
 from PIL import Image
 
-from anygrep import cli, indexer, thresholds
+from anygrep import cli, indexer, store, thresholds
 from anygrep.paths import _unwalkable, canonical
 from anygrep.store import Store, acquire_writer_lock, lock_path, readonly_uri
 
-from .conftest import jsonl
+from .conftest import drop_column, jsonl
 
 JSON_KEYS = [
     "rank", "path", "type", "line_start", "line_end", "page", "score", "weak", "exact",
@@ -268,7 +268,7 @@ def test_over_budget_partly_indexed(env, notes: Path, cutoff, capsys, monkeypatc
     assert code == 0 and env.calls["docs"] == calls  # all or nothing: nothing embedded
     assert "new.md" not in out
     lines = err.strip().splitlines()
-    assert len(lines) == 1 and "has new files not indexed yet" in lines[0]
+    assert len(lines) == 1 and "has new or changed files not indexed yet" in lines[0]
     assert "searched the indexed part" in lines[0]
     assert lines[0].endswith(f"anygrep index {cli._tilde(str(canonical(notes)))}")
     assert err.rstrip().endswith(lines[0])  # after the results, the last thing shown
@@ -527,7 +527,7 @@ def test_readonly_old_index_does_not_migrate(env, tmp_path: Path) -> None:
     db = tmp_path / "old.sqlite"
     Store(db).close()
     with sqlite3.connect(db) as conn:
-        conn.execute("ALTER TABLE files DROP COLUMN sig")
+        drop_column(conn, "files", "sig")
     old = Store(db, create=False, readonly=True)
     try:
         assert old._sig_col == "NULL"
@@ -712,7 +712,8 @@ def test_tty_format(env, notes: Path, cutoff, capsys, tty) -> None:
     code, out, _ = run(capsys, "bread", str(notes), "-t", "text")
     assert code == 0
     first = out.splitlines()[0]
-    assert re.search(r"bread\.md:1  \(exact\)$", first) and not re.search(r":\d+-\d+", out)
+    mark = r"  \(exact\)" if store.fts_available() else ""
+    assert re.search(rf"bread\.md:1{mark}$", first) and not re.search(r":\d+-\d+", out)
     code, out, err = run(capsys, NONSENSE, str(notes))
     assert code == 1 and out.startswith(cli.NO_STRONG) and "(weak)" in out
     code, out, err = run(capsys, NONSENSE, str(notes), "-t", "image", "-g", "*.nothing")
@@ -1008,25 +1009,35 @@ def test_index_exits_2_when_a_file_failed(env, corpus: Path, capsys) -> None:
     assert code == 0 and "failed" not in err
 
 
-def test_hidden_weak_results_are_counted(env, notes: Path, cutoff, capsys, tty) -> None:
-    """On a terminal, a line at the end says how many weak results --weak
-    would add; other output and the exit status do not change."""
+def test_hidden_weak_results_are_counted(
+    env, notes: Path, cutoff, capsys, tty, monkeypatch
+) -> None:
+    """On a terminal, a line at the end says how many results just below the
+    cutoff --weak would add; other output and the exit status do not change."""
+    from anygrep import search as search_mod
+
+    line = "just below the cutoff"
     index(capsys, notes)
     rows = jsonl(run(capsys, "bread", str(notes), "--json", "--weak")[1])
     n_weak = sum(r["weak"] for r in rows)
     assert n_weak > 1 and any(not r["weak"] for r in rows)
+    monkeypatch.setattr(search_mod, "NEAR_MARGIN", 1.0)  # every weak result is near
     code, out, _ = run(capsys, "bread", str(notes), "--json")
-    assert code == 0 and "weaker match" not in out
+    assert code == 0 and line not in out
     code, out, _ = run(capsys, "bread", str(notes))
-    assert code == 0 and "weaker match" not in out  # piped: grep format only
+    assert code == 0 and line not in out  # piped: grep format only
     tty()
     code, out, _ = run(capsys, "bread", str(notes))
     assert code == 0
-    assert out.splitlines()[-1] == f"{n_weak} weaker matches hidden (--weak shows them)"
-    assert out.count("weaker match") == 1
+    assert out.splitlines()[-1] == f"{n_weak} more results {line} (--weak shows them)"
+    assert out.count(line) == 1
     code, out, _ = run(capsys, "bread", str(notes), "--weak")
-    assert code == 0 and "weaker match" not in out
+    assert code == 0 and line not in out
     code, out, _ = run(capsys, "bread", str(notes), "-m", "1")
-    assert "weaker match" not in out  # nothing weak in the top 1
+    assert line not in out  # nothing weak in the top 1
     code, out, _ = run(capsys, NONSENSE, str(notes))
-    assert code == 1 and "weaker match" not in out  # the closest results are shown instead
+    assert code == 1 and line not in out  # the closest results are shown instead
+    # Results far below the cutoff are not counted.
+    monkeypatch.setattr(search_mod, "NEAR_MARGIN", 0.0)
+    code, out, _ = run(capsys, "bread", str(notes))
+    assert code == 0 and line not in out

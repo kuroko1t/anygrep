@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 from pathlib import Path
 
 import pytest
 
 import anygrep
 from anygrep import cli, embedder, store, thresholds
+from anygrep import search as search_mod
 from anygrep.indexer import IndexOptions, run_index
 from anygrep.search import scope_matcher, search
 from anygrep.store import Store
 
 from .conftest import FakeEmbedder, jsonl, write_pdf
+
+pytestmark = pytest.mark.skipif(
+    not store.fts_available(), reason="this SQLite has no FTS5 trigram tokenizer"
+)
 
 FILLER = " ".join(f"word{i}" for i in range(60))
 
@@ -87,7 +93,9 @@ def test_case_pdf_name_and_false_positives(
     hits = query(st, fake_embedder, "lx-4471")
     assert hits[0].exact and hits[0].kind == "pdf" and hits[0].page == 2
     assert exact("budget-draft") == ["Q3-budget-draft.txt"]  # file name
-    assert exact("notes/inv", prefixes=[str(docs)]) == ["invoice.md"]  # relative path
+    # The file name only, not the folders above it.
+    assert exact("notes/inv", prefixes=[str(docs)]) == []
+    assert exact("notes") == []
     # SQLite LIKE wildcards in the query are not wildcards here.
     assert exact("ABC_77812") == [] and exact("ABC%7812") == []
     assert exact("AB") == []  # under 3 characters: meaning only
@@ -264,3 +272,150 @@ def test_writer_opened_before_the_table_was_made(
     other.fill_fts()
     check(other)
     assert query(other, fake_embedder, "PQR-6060")[0].exact
+
+
+def test_case_and_width_of_any_script(tmp_path: Path, corpus: Path, fake_embedder) -> None:
+    """Case is ignored for every script, and text is compared in NFKC form:
+    decomposed accents and full-width letters and digits match too."""
+    (corpus / "ru.txt").write_text("Москва Россия. Große Äpfel und Öl.\n", encoding="utf-8")
+    nfd = unicodedata.normalize("NFD", "café in Zürich")
+    (corpus / "nfd.txt").write_text(nfd + "\n", encoding="utf-8")
+    (corpus / "full.txt").write_text("Ｗｉｆｉ設定 ＡＢＣ１２３\n", encoding="utf-8")
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, corpus, fake_embedder)
+
+    def exact(q: str) -> list[str]:
+        return sorted(Path(h.path).name for h in query(st, fake_embedder, q) if h.exact)
+
+    for q in ("москва россия", "МОСКВА РОССИЯ", "Москва"):
+        assert exact(q) == ["ru.txt"], q
+    assert exact("große äpfel") == exact("GROSSE ÄPFEL") == ["ru.txt"]
+    assert exact("zürich") == exact("café in") == ["nfd.txt"]
+    for q in ("wifi設定", "ABC123", "abc１２３", "ＡＢＣ１２３"):
+        assert exact(q) == ["full.txt"], q
+    check(st)
+
+
+def test_short_words_and_common_strings(tmp_path: Path, corpus: Path, fake_embedder) -> None:
+    """A query of 3 or 4 ASCII letters matches whole words only, and a
+    string found in many of the files searched gives no exact matches."""
+    (corpus / "a.txt").write_text("Do not run this script twice.\n")
+    (corpus / "b.txt").write_text("It truncates the log and prunes old files.\n")
+    (corpus / "c.txt").write_text("Set up the pipeline first.\n")
+    (corpus / "d.txt").write_text("Install it with pip, then restart.\n")
+    for i in range(12):
+        (corpus / f"common{i}.txt").write_text(f"Entry {i} of the list: zebra{i}.\n")
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, corpus, fake_embedder)
+
+    def exact(q: str) -> list[str]:
+        hits = query(st, fake_embedder, q, n=30, hide_weak=False)
+        return sorted(Path(h.path).name for h in hits if h.exact)
+
+    assert exact("run") == ["a.txt"]
+    assert exact("pip") == ["d.txt"]
+    assert exact("pipe") == []
+    assert exact("pipeline") == ["c.txt"]  # longer queries match inside words
+    assert exact("trunc") == ["b.txt"]
+    # "the" is in 14 files, more than the limit of 10 for 17 files.
+    assert exact("the") == []
+    assert exact("zebra") == []  # 12 files, also more than the limit
+    assert search_mod.EXACT_MAX_FILES < 12
+    assert exact("zebra1") == ["common1.txt", "common10.txt", "common11.txt"]
+
+
+def test_query_syntax_is_literal(tmp_path: Path, corpus: Path, fake_embedder) -> None:
+    (corpus / "q.txt").write_text('He said "stop" (NOT now) AND left; 50% of a_b OR c*d; x"y\n')
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, corpus, fake_embedder)
+    for q in ('"stop"', "(NOT now)", "AND left", "50%", "a_b OR", "c*d", 'x"y', "now) AND"):
+        hits = query(st, fake_embedder, q)
+        assert hits and hits[0].exact and hits[0].path.endswith("q.txt"), q
+    for q in ("a%b", "50_", "c?d", '"AND"', "NOT stop"):
+        assert not any(h.exact for h in query(st, fake_embedder, q)), q
+
+
+def test_very_long_query(tmp_path: Path, docs: Path, fake_embedder, cutoff) -> None:
+    """A query of any length is looked up without an error, also where the
+    chunk text is read directly (a read-only index made before exact
+    matching)."""
+    path = tmp_path / "idx.sqlite"
+    st = Store(path)
+    index(st, docs, fake_embedder)
+    long = "x" * 60000
+    assert not any(h.exact for h in query(st, fake_embedder, long))
+    text = "Payment reference ABC-77812 for the garden shed."
+    assert query(st, fake_embedder, text)[0].exact
+    st.close()
+    drop_fts(path)
+    ro = Store(path, readonly=True)
+    assert not ro.fts
+    assert not any(h.exact for h in query(ro, fake_embedder, long))
+    assert query(ro, fake_embedder, "ABC-77812")[0].exact
+
+
+def test_lookup_runs_once_per_state(tmp_path: Path, docs: Path, fake_embedder, monkeypatch):
+    st = Store(tmp_path / "idx.sqlite")
+    index(st, docs, fake_embedder)
+    calls = []
+    real = st._exact_lookup
+    monkeypatch.setattr(st, "_exact_lookup", lambda *a: calls.append(a) or real(*a))
+    query(st, fake_embedder, "ABC-77812")
+    query(st, fake_embedder, "ABC-77812", hide_weak=False)
+    assert len(calls) == 1
+    (docs / "notes" / "invoice.md").write_text("Now the reference is DEF-1234.\n")
+    index(st, docs, fake_embedder)
+    assert not any(h.exact for h in query(st, fake_embedder, "ABC-77812"))
+    assert len(calls) == 2
+
+
+def test_schema_moves_to_two(tmp_path: Path, docs: Path, fake_embedder) -> None:
+    """An index of schema 1 (anygrep 0.2) is read as it is and moved to
+    schema 2 by a writer, which anygrep 0.2 then refuses: it would change
+    the chunks without the FTS table."""
+    path = tmp_path / "idx.sqlite"
+    st = Store(path)
+    index(st, docs, fake_embedder)
+    st.close()
+    drop_fts(path)
+    db = sqlite3.connect(path)
+    db.execute("UPDATE meta SET value='1' WHERE key='schema_version'")
+    db.execute("DELETE FROM meta WHERE key='fts_format'")
+    db.commit()
+    db.close()
+    ro = Store(path, readonly=True)
+    assert ro.get_meta("schema_version") == "1"
+    ro.close()
+    st = Store(path)
+    assert st.get_meta("schema_version") == str(store.SCHEMA_VERSION) == "2"
+
+
+def test_damaged_fts_table_is_rebuilt(tmp_path: Path, docs: Path, fake_embedder, cutoff):
+    """A write that finds the FTS table damaged still succeeds, lookups read
+    the chunk text until then, and the next update rebuilds the table."""
+    path = tmp_path / "idx.sqlite"
+    st = Store(path)
+    index(st, docs, fake_embedder)
+    st.close()
+    db = sqlite3.connect(path)
+    db.execute(f"UPDATE {store.FTS_TABLE}_data SET block=x'ffffffff'")
+    db.commit()
+    db.close()
+    st = Store(path)
+    (docs / "notes" / "invoice.md").write_text("Reference GHI-5550 now.\n")
+    index(st, docs, fake_embedder)
+    assert st.get_meta("fts_reset") == "1" and st.exact_state() == "building"
+    assert query(st, fake_embedder, "GHI-5550")[0].exact
+    assert not any(h.exact for h in query(st, fake_embedder, "ABC-77812"))
+    st.fill_fts()
+    assert st.exact_state() == "ready"
+    check(st)
+    assert query(st, fake_embedder, "GHI-5550")[0].exact
+    assert query(st, fake_embedder, "LX-4471")[0].exact
+
+
+def drop_fts(path: Path) -> None:
+    db = sqlite3.connect(path)
+    db.execute(f"DROP TABLE {store.FTS_TABLE}")
+    db.commit()
+    db.close()

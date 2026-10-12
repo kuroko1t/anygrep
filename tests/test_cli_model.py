@@ -396,12 +396,12 @@ def test_cli_status_model_reset_and_guards(env, corpus: Path, monkeypatch, capsy
 def test_cli_index_mismatch_asks_for_reset(env, corpus: Path, capsys) -> None:
     import sqlite3
 
-    from anygrep.store import SCHEMA_VERSION
+    from anygrep.store import OLDEST_SCHEMA, SCHEMA_VERSION
 
     assert cli.main(["index", str(corpus), "-q"]) == 0
     idx = Path(_status(capsys)["index"])
     for key, value, hint in (
-        ("schema_version", str(SCHEMA_VERSION - 1), "anygrep reset"),
+        ("schema_version", str(OLDEST_SCHEMA - 1), "anygrep reset"),
         ("schema_version", str(SCHEMA_VERSION + 1), "Upgrade anygrep"),
         ("model_revision", "x", "anygrep reset"),
     ):

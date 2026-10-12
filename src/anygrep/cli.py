@@ -59,6 +59,8 @@ usage: anygrep [OPTIONS] QUERY [PATH ...]         search (default command)
        anygrep model [--download]
 
 QUERY is one argument: quote multi-word queries. Later arguments are PATHs.
+Files whose text or file name contains QUERY as typed (3 or more characters,
+case ignored) come first, marked (exact).
 PATH defaults to the current directory. New or changed files under PATH are
 indexed first, with a progress bar; Ctrl-C stops and the next run continues.
 When stderr is not a terminal, the new files are indexed only if that should
@@ -693,7 +695,7 @@ def _print_human(
     hits, query: str | None, color: bool, fallback: bool = False, hidden: int = 0
 ) -> None:
     """The terminal view: rank, score, location and a snippet per result.
-    `hidden`: weak results left out that --weak would show."""
+    `hidden`: results just below the cutoff that --weak would show."""
     from .search import snippet
 
     width = 160
@@ -726,8 +728,9 @@ def _print_human(
             note = f"(+{len(h.similar)} similar: {', '.join(names)}{', ...' if more else ''})"
             print("      " + _style(note, "2", color))
     if hidden:
-        matches = "weaker matches" if hidden != 1 else "weaker match"
-        print(_style(f"{hidden} {matches} hidden (--weak shows them)", "2", color))
+        what, them = ("results", "them") if hidden != 1 else ("result", "it")
+        line = f"{hidden} more {what} just below the cutoff (--weak shows {them})"
+        print(_style(line, "2", color))
 
 
 def _grep_line(h, query: str | None, color: bool) -> str:
@@ -1092,10 +1095,13 @@ def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int |
     est = sum(estimate_cost(e, opts.image_budget) for e, _ in todo) * throughput_factor(store)
     if not (visible or args.yes or est <= args.index_budget):
         if indexed:
-            args.after_notes.append(
-                f"anygrep: {where} has new files not indexed yet; searched the indexed part. "
-                f"Update with: {_hint('index')} {where}"
-            )
+            # Files that an older anygrep processed have their own note
+            # (_outdated_notes); say this only when others wait too.
+            if report.outdated < len(todo):
+                args.after_notes.append(
+                    f"anygrep: {where} has new or changed files not indexed yet; searched the "
+                    f"indexed part. Update with: {_hint('index')} {where}"
+                )
             return None
         _err(
             f"anygrep: {where} is not indexed yet and is too large to index automatically "
@@ -1174,9 +1180,9 @@ def _outdated_notes(args, store) -> list[str]:
     if not n:
         return []
     where = "" if args.everywhere else f" {_scope_text(args.scope)}"
-    files = f"{n:,} file{'s' if n != 1 else ''}"
+    files = f"{n:,} file{'s' if n != 1 else ''}" + (" in the index" if args.everywhere else " here")
     return [
-        f"anygrep: {files} here {'were' if n != 1 else 'was'} indexed by an older version of "
+        f"anygrep: {files} {'were' if n != 1 else 'was'} indexed by an older version of "
         f"anygrep and will be indexed again by the next update; their results may differ "
         f"until then. Update now with: {_hint('index')}{where}"
     ]
@@ -1258,9 +1264,9 @@ def _search(args, store) -> int:
                 hits = find(few, hide_weak=False)
                 fallback = bool(hits)
             elif not args.weak:
-                # Say how many weak results --weak would add, so a file that is
-                # just below the cutoff is not taken for missing.
-                hidden = sum(h.weak for h in find(n, hide_weak=False))
+                # Say how many results --weak would add just below the cutoff,
+                # so such a file is not taken for missing.
+                hidden = sum(h.near for h in find(n, hide_weak=False))
             _print_human(hits, query_text, color, fallback, hidden)
         elif mode != "quiet":
             if not hits:

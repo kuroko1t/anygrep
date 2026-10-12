@@ -14,18 +14,24 @@ All notable changes to anygrep are listed here. The format follows
   resumable like any other change, instead of needing `anygrep reset`. A search that does not update
   them says so in one line on stderr; `anygrep status` shows the count and the Python API has
   `Index.update_pending`. A different model revision still needs a reset.
-- Exact matches. A text query of 3 or more characters is also looked up as a plain string (ignoring
-  case) in the indexed text and the file paths, so an invoice number, an error code or a file name finds
-  the file that contains it. Those files always come first, best score first, even below the relevance
-  cutoff, marked `(exact)` on a terminal, `"exact": true` in `--json` and `Hit.exact` in the Python API.
+- Exact matches. A text query of 3 or more characters is also looked up as a plain string in the
+  indexed text and the file names, ignoring case and Unicode width (NFKC), so an invoice number, an
+  error code or a file name finds the file that contains it. Those files always come first, best score
+  first, even below the relevance cutoff, marked `(exact)` on a terminal, `"exact": true` in `--json`
+  and `Hit.exact` in the Python API. Queries of 3 or 4 ASCII letters match whole words only, and a
+  string found in more than 10 of the files searched (and more than 5% of them) gives no exact matches.
   It uses an SQLite FTS5 trigram index (SQLite 3.34 or later; without it searches use meaning only and
   `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;
-  the index file grows by about the size of the text it holds (47% in a test with 2,000 notes).
-- On a terminal, a search that hid weak results ends with one dim line such as `3 weaker matches
-  hidden (--weak shows them)`. Piped output, `-l`, `--json` and the exit status do not change.
+  the index file grows by about a third to a half (47% in a test with 2,000 notes).
+- On a terminal, a search that hid results just below the cutoff ends with one dim line such as `2 more
+  results just below the cutoff (--weak shows them)`. Piped output, `-l`, `--json` and the exit status
+  do not change.
 
 ### Changed
 
+- The index schema is now 2. An index of schema 1 is read as it is and moved to schema 2 by the first
+  update; anygrep 0.2 and earlier then refuse it and ask for an upgrade, because they would change the
+  chunks without keeping the exact-match table.
 - Images are grouped as near-duplicates only when they are exact copies (the same bytes). Before, images
   whose embeddings were almost the same were grouped too, which also hid charts or statements whose
   numbers differ. A resized or recompressed copy of a picture is now listed as a result of its own.

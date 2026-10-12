@@ -60,7 +60,10 @@ At the default image budget of 140:
 | image -> text | 1.00 (2/2) | 0.01 | 0.15 |
 | image -> pdf | 1.00 (1/1) | 0.02 | 1.00 |
 
-None of the 40 unrelated queries shows a result; they get the "No strong matches" fallback. Precision
+By meaning, none of the 40 unrelated queries shows a result; they get the "No strong matches" fallback.
+Exact matches (see [usage.md](usage.md#exact-matches)) are shown whatever their score, but none of these
+queries has one: `the` is in 15 of the 36 files, too many to count as a clue, and the others are in no
+file. Precision
 counts every file above the cutoff that was not labelled relevant, including related ones, such as a
 Wi-Fi settings screenshot for "router admin page address". These numbers are in-sample: the values were
 chosen on these queries.

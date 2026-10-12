@@ -13,7 +13,7 @@ from anygrep import cli, config, embedder
 from anygrep.indexer import IndexOptions, record_generation, run_index
 from anygrep.store import Store
 
-from .conftest import FakeEmbedder
+from .conftest import FakeEmbedder, drop_column
 
 
 def index(store: Store, roots, emb: FakeEmbedder, **kw):
@@ -97,7 +97,7 @@ def test_index_from_before_generations_is_generation_one(
     index(store, [corpus], fake_embedder)
     store.close()
     db = sqlite3.connect(path)
-    db.execute("ALTER TABLE files DROP COLUMN gen")
+    drop_column(db, "files", "gen")
     db.execute("DELETE FROM meta WHERE key='processing_generation'")
     db.commit()
     db.close()

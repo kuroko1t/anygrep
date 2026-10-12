@@ -32,8 +32,9 @@ The design decisions behind these steps are in [DESIGN.md](DESIGN.md) (in Japane
    By default it shows the best chunk per file, ranked across all types, with near-duplicate files
    grouped under the best-ranked one. Results below the [relevance cutoff](relevance.md) are hidden.
    A text query of 3 or more characters is also looked up as a plain string in the chunk text (an
-   SQLite FTS5 trigram index, kept in the same transactions as the chunks) and in the file paths; files
-   that contain it come first, marked as exact, whatever their score.
+   SQLite FTS5 trigram index, kept in the same transactions as the chunks) and in the file names; files
+   that contain it come first, marked as exact, whatever their score. Short words match whole words
+   only, and a string found in many of the files searched does not count.
 
 The image preprocessing is a small numpy port of the reference processor. It matches the reference
 implementation's embeddings with a cosine similarity of at least 0.9999.

@@ -161,5 +161,20 @@ def tty(monkeypatch):
     return on
 
 
+def drop_column(db, table: str, column: str) -> None:
+    """Remove a column the way an index made before it looks, without ALTER
+    TABLE DROP COLUMN (SQLite 3.35+): copy the table without it."""
+    (sql,) = db.execute("SELECT sql FROM sqlite_master WHERE name=?", (table,)).fetchone()
+    new_sql = re.sub(rf",\s*{column} [A-Z]+", "", sql, count=1)
+    assert new_sql != sql
+    cols = ", ".join(r[1] for r in db.execute(f"PRAGMA table_info({table})") if r[1] != column)
+    db.execute("PRAGMA foreign_keys=OFF")
+    db.execute(new_sql.replace(f"TABLE {table}", f"TABLE _new_{table}", 1))
+    db.execute(f"INSERT INTO _new_{table}({cols}) SELECT {cols} FROM {table}")
+    db.execute(f"DROP TABLE {table}")
+    db.execute(f"ALTER TABLE _new_{table} RENAME TO {table}")
+    db.commit()
+
+
 def jsonl(text: str) -> list[dict]:
     return [json.loads(line) for line in text.splitlines()]

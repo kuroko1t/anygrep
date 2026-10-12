@@ -35,8 +35,8 @@ anygrep index --background ~/Pictures         # big folder: index in a low-prior
 ```
 
 Results are the 10 closest files by meaning (`-m N` for more), not every match; queries are not regular
-expressions. Files whose text or name contains the query as typed (an invoice number, an error code) come
-first, marked `(exact)`. Queries and documents can be in different languages. Weak matches are hidden
+expressions. Files whose text or file name contains the query as typed (an invoice number, an error code) come
+first, marked `(exact)`; common words do not count ([details](docs/usage.md#exact-matches)). Queries and documents can be in different languages. Weak matches are hidden
 (`--weak` shows them) and near-duplicate files are shown once. See `anygrep -h` and [docs/usage.md](docs/usage.md).
 
 The first search in a big folder indexes the new files first, with a progress bar; Ctrl-C keeps what is

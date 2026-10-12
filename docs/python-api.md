@@ -101,9 +101,10 @@ changed). When `image` is a file in the index, that file is left out of the resu
 - `chunks=True`: return the best chunks rather than the best files, so a file can appear more than
   once.
 
-A text `query` of 3 or more characters also finds the files whose text or path contains it as typed,
-ignoring case ([exact matches](usage.md#exact-matches)). They come first, best score first, with
-`Hit.exact` set, and are returned even when their score is below the cutoff.
+A text `query` of 3 or more characters also finds the files whose text or file name contains it as
+typed, ignoring case ([exact matches](usage.md#exact-matches), with the same limits for short and
+common words). They come first, best score first, with `Hit.exact` set, and are returned even when
+their score is below the cutoff; their `weak` is then still `False`.
 
 `search()` only reads the index; unlike the command it does not index new files first. Call `update()`
 for that. When nothing passes the cutoff the list is empty, and so it is for a new or empty index; the
@@ -123,13 +124,13 @@ A frozen dataclass.
 | `path` | absolute path of the file |
 | `type` | `"text"`, `"pdf"` or `"image"` |
 | `score` | cosine similarity, about 0 to 1; higher is closer |
-| `weak` | below the relevance cutoff (only with `weak=True`) |
+| `weak` | below the relevance cutoff (only with `weak=True`); never set on an exact match |
 | `page` | page number for a PDF, else `None` |
 | `line_start`, `line_end` | 1-based lines of the chunk in a text file, else `None` |
 | `snippet` | one line around the query words, as in `--json` (`""` for images, where `--json` has `null`) |
 | `text` | the whole text of the matching chunk (`None` for images) |
 | `similar` | near-duplicate files grouped under this one, as `Hit`s |
-| `exact` | the file's text or path contains the query as typed (these come first) |
+| `exact` | the file's text or file name contains the query as typed (these come first) |
 
 ## Errors
 

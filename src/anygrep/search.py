@@ -15,7 +15,7 @@ import numpy as np
 from .config import DEFAULT_IMAGE_BUDGET
 from .paths import canonical
 from .signature import changed_share, signature
-from .store import Hit, Store, Vectors
+from .store import Hit, Store, Vectors, fold, word_pattern
 from .thresholds import weak_mask
 
 if TYPE_CHECKING:
@@ -239,38 +239,33 @@ def search(
 
 # Exact matches: a query of at least this many characters (shorter ones
 # would match almost everything) is also looked up as a plain string in the
-# chunk text and in the file names. Scores are cosines (at most 1), so the
-# boost puts exact matches above every other result without changing their
-# order among themselves.
+# chunk text and in the file names, both folded (store.fold(): case and
+# Unicode width ignored). Scores are cosines (at most 1), so in the ranking
+# the boost puts exact matches above every other result without changing
+# their order among themselves; the scores shown stay the cosines.
 EXACT_MIN_CHARS = 3
 _EXACT_BOOST = 10.0
+# A query of 3 or 4 ASCII letters matches only whole words: "run" not in
+# "truncates", "pip" not in "pipeline".
+_SHORT_WORD = re.compile(r"[a-z]{3,4}")
+# A string found in more files than this is no clue to a particular file
+# ("the", "and", a folder's common word): the query then has no exact
+# matches and is searched by meaning only. The limit is the larger of the
+# count and the share of the files searched.
+EXACT_MAX_FILES = 10
+EXACT_MAX_SHARE = 0.05
+# A weak result counts as just below the cutoff (Hit.near) when its score
+# is less than this under the score it needs.
+NEAR_MARGIN = 0.02
 
 
 def exact_needle(query: str | None) -> str | None:
-    """The string exact matching looks for, or None for no exact matching."""
+    """The folded string exact matching looks for, or None for no exact
+    matching."""
     if query is None:
         return None
-    q = query.strip()
+    q = fold(query.strip())
     return q if len(q) >= EXACT_MIN_CHARS else None
-
-
-def _relative_names(paths: Sequence[str], bases: Sequence[str]) -> list[str]:
-    """Each path relative to the longest of `bases` it is under, with /
-    separators and folded case (its file name when it is a base itself or
-    under none)."""
-    folded = sorted({os.path.normcase(b.rstrip("/\\")) for b in bases}, key=len, reverse=True)
-    out = []
-    for p in paths:
-        q = os.path.normcase(p)
-        rel = None
-        for b in folded:
-            if q.startswith(b + os.sep):
-                rel = p[len(b) + 1 :]
-                break
-        if rel is None:
-            rel = os.path.basename(p)
-        out.append(rel.replace(os.sep, "/").casefold())
-    return out
 
 
 def _exact_rows(
@@ -279,27 +274,35 @@ def _exact_rows(
     v: Vectors,
     file_ok: np.ndarray,
     scores: np.ndarray,
-    prefixes: Sequence[str] | None,
     per_file: bool,
 ) -> np.ndarray:
     """Rows to rank as exact matches: per file the best chunk containing the
-    needle, or its best chunk when only its name does (with per_file false,
-    every chunk containing it)."""
+    needle, or its best chunk when only its file name does (with per_file
+    false, every chunk containing it). None of them when the needle is in
+    too many of the files searched."""
     rows = np.zeros(len(v.ids), bool)
-    ids = store.exact_chunks(needle)
+    word = _SHORT_WORD.fullmatch(needle) is not None
+    ids = store.exact_chunks(needle, word=word)
     if ids is None:  # no FTS5 in this SQLite: meaning only
         return rows
     text_rows = (
         np.isin(v.ids, np.fromiter(ids, np.int64, len(ids))) if ids else rows.copy()
     ) & file_ok[v.file_of]
-    fold = needle.casefold().replace("\\", "/")
-    bases = list(prefixes) if prefixes else store.roots()
-    names = _relative_names(v.paths, bases)
+    pat = word_pattern(needle) if word else None
+    names = (fold(os.path.basename(p.rstrip("/\\"))) for p in v.paths)
     by_name = np.fromiter(
-        (ok and fold in name for ok, name in zip(file_ok, names, strict=True)), bool, len(names)
+        (
+            ok and (pat.search(name) is not None if pat else needle in name)
+            for ok, name in zip(file_ok, names, strict=True)
+        ),
+        bool,
+        len(v.paths),
     )
     with_text = np.zeros(len(v.paths), bool)
     with_text[v.file_of[text_rows]] = True
+    matched = int((with_text | by_name).sum())
+    if matched > max(EXACT_MAX_FILES, EXACT_MAX_SHARE * int(file_ok.sum())):
+        return rows
     cand = np.flatnonzero(text_rows | (by_name & ~with_text)[v.file_of])
     if len(cand) == 0:
         return rows
@@ -367,7 +370,9 @@ def _search(
     row_kinds = v.row_kinds()
     # Weak is decided per result from the query and the shipped reference set,
     # independent of what is indexed and of the scope.
-    weak = weak_mask(scores, row_kinds, query_kind, budget, qvec)
+    # Rows embedded at another image budget than the query's: (rows, their
+    # budget, the query vector they are compared with; None: always weak).
+    other_budgets: list[tuple[np.ndarray, int, np.ndarray | None]] = []
     if v.budgets is not None:
         file_budgets = np.asarray([b if b is not None else budget for b in v.budgets])
         row_budgets = file_budgets[v.file_of]
@@ -380,11 +385,23 @@ def _search(
             image_q = qvec
             if query_kind == "image":
                 image_q = (image_queries or {}).get(result_budget)
-                if image_q is None:
-                    weak[sel] = True
-                    continue
-                scores[sel] = v.mat[sel] @ np.asarray(image_q, np.float32)
-            weak[sel] = weak_mask(scores[sel], row_kinds[sel], query_kind, result_budget, image_q)
+                if image_q is not None:
+                    scores[sel] = v.mat[sel] @ np.asarray(image_q, np.float32)
+            other_budgets.append((sel, result_budget, image_q))
+
+    def weak_at(offset: float) -> np.ndarray:
+        """Weak rows, were every score `offset` higher."""
+        w = weak_mask(scores + offset, row_kinds, query_kind, budget, qvec)
+        for sel, result_budget, image_q in other_budgets:
+            if image_q is None:
+                w[sel] = True
+            else:
+                w[sel] = weak_mask(
+                    scores[sel] + offset, row_kinds[sel], query_kind, result_budget, image_q
+                )
+        return w
+
+    weak = weak_at(0.0)
     keep = ~weak if hide_weak else np.ones(len(v.ids), bool)
     # Paths are tested once per file, not once per chunk.
     file_ok = np.ones(len(v.paths), bool)
@@ -397,7 +414,7 @@ def _search(
     exact_rows = np.zeros(len(v.ids), bool)
     needle = exact_needle(exact) if query_kind == "text" else None
     if needle is not None:
-        exact_rows = _exact_rows(store, needle, v, file_ok, scores, prefixes, per_file)
+        exact_rows = _exact_rows(store, needle, v, file_ok, scores, per_file)
         keep |= exact_rows
         weak &= ~exact_rows
     keep &= file_ok[v.file_of]
@@ -421,6 +438,7 @@ def _search(
             if len(groups) >= n:
                 break
     details = store.chunk_details(int(v.ids[i]) for g in groups for i in g)
+    near = weak & ~weak_at(NEAR_MARGIN) if weak.any() else weak
 
     def hit(i: int) -> Hit | None:
         d = details.get(int(v.ids[i]))
@@ -430,7 +448,7 @@ def _search(
         f = int(v.file_of[i])
         return Hit(
             float(scores[i]), v.paths[f], v.kinds[f], page, ls, le, text, int(v.ids[i]),
-            weak=bool(weak[i]), exact=bool(exact_rows[i]),
+            weak=bool(weak[i]), exact=bool(exact_rows[i]), near=bool(near[i]),
         )  # fmt: skip
 
     hits = []

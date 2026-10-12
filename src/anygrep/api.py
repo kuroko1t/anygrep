@@ -66,8 +66,9 @@ class Hit:
     --json has null) and `text`
     the whole matching chunk. `weak` marks a result below the relevance
     cutoff (only returned with `weak=True`). `exact` marks a file whose
-    text or name contains the query as typed (ignoring case); these come
-    first. `similar` lists the near-duplicate files collapsed under this
+    text or file name contains the query as typed (ignoring case and
+    Unicode width); these come first and are never marked weak, even below
+    the cutoff. `similar` lists the near-duplicate files collapsed under this
     one."""
 
     path: str
