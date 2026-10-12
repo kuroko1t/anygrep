@@ -218,7 +218,7 @@ screenshots/error-dialog.png:1:[image]
 ```
 
 `--json` writes one JSON object per result and line, in rank order, with the keys `rank`, `path`
-(absolute), `type`, `line_start`, `line_end`, `page`, `score`, `weak`, `snippet` and `similar` (the
+(absolute), `type`, `line_start`, `line_end`, `page`, `score`, `weak`, `exact`, `snippet` and `similar` (the
 collapsed near-duplicates, with the same keys except `rank` and `similar`). `-l` prints each matching file
 once, best first.
 
@@ -239,7 +239,7 @@ PowerShell and cmd decode it with; set `[Console]::OutputEncoding = [Text.Encodi
 
 | Status | Meaning |
 |---|---|
-| 0 | at least one result passed the relevance cutoff (any result with `--weak`) |
+| 0 | at least one result passed the relevance cutoff or matched exactly (any result with `--weak`) |
 | 1 | the scope was searched and nothing passed the cutoff |
 | 2 | an error, including a missing PATH or nothing indexed under the PATH |
 | 130 | interrupted (Ctrl-C) |
@@ -267,6 +267,27 @@ No strong matches; showing the closest results.
  2  0.615  screenshots/terminal.png  [image]  (weak)
 exit=1
 ```
+
+### Exact matches
+
+A text query of 3 or more characters is also looked up as a plain string, ignoring case, in the indexed
+text and in the file paths (relative to the searched folder, or to the indexed folder with
+`--everywhere`). Files that contain it are always listed, even when their score is below the cutoff,
+and come before all other results, best score first. On a terminal they are marked `(exact)`, in
+`--json` they have `"exact": true`, and the piped format and `-l` simply list them first. They count as
+matches for the exit status. PATHs, `-g`, `-t` and `-m` apply to them as to any result.
+
+This is for things that have no meaning to match, such as an invoice number, an error code, a part
+number or a file name: `anygrep INV-20391` finds the one note that mentions it. It is a substring
+match, not a regular expression, and the whole query must appear as typed (`tax return` does not match
+`tax\nreturn` across a line break). Shorter queries are searched by meaning only. Searching an image
+never matches exactly.
+
+Exact matching uses SQLite's FTS5 full-text index with the trigram tokenizer, which needs SQLite 3.34 or
+later (Python's own `sqlite3` module has had it for years on most systems). Without it anygrep searches
+by meaning only, and `anygrep status` says so. An index made by an earlier version of anygrep gets the
+full-text table on the next `anygrep index` or search that indexes; until then, exact matches are found
+by reading the stored text, which is slower on a large index.
 
 ### Near-duplicates
 

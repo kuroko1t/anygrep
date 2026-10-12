@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import os
 import sqlite3
+import sys
 import time
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -52,6 +53,42 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 CREATE INDEX IF NOT EXISTS chunks_file ON chunks(file_id);
 """
+
+
+# Exact matching (search.py): an FTS5 index with the trigram tokenizer over
+# the chunk text, kept in the same transactions as the chunks. It stores no
+# copy of the text (content='chunks') and no positions (detail='none'); LIKE
+# queries use it and every candidate is checked against the chunk text.
+# Every chunk has a row, also those without text (images), as FTS5's
+# integrity check expects of an external content table.
+FTS_TABLE = "chunks_fts"
+FTS_SCHEMA = (
+    f"CREATE VIRTUAL TABLE {FTS_TABLE} USING fts5(text, content='chunks', "
+    "content_rowid='id', tokenize='trigram', detail='none')"
+)
+# Chunks whose id is in (fts_pos, fts_end] (meta) are not in the FTS index
+# yet: an index made before it existed, filled in by the next update.
+FTS_BATCH = 2000
+_fts_ok: bool | None = None
+
+
+def fts_available(db: sqlite3.Connection | None = None) -> bool:
+    """True when this SQLite has FTS5 with the trigram tokenizer (3.34+)."""
+    global _fts_ok
+    if _fts_ok is None:
+        probe = db or sqlite3.connect(MEMORY)
+        try:
+            probe.execute(
+                "CREATE VIRTUAL TABLE temp._anygrep_probe USING fts5(x, tokenize='trigram')"
+            )
+            probe.execute("DROP TABLE temp._anygrep_probe")
+            _fts_ok = True
+        except sqlite3.Error:
+            _fts_ok = False
+        finally:
+            if db is None:
+                probe.close()
+    return _fts_ok
 
 
 def _create_private(path: Path) -> None:
@@ -119,6 +156,8 @@ class Hit:
     text: str | None
     chunk_id: int
     weak: bool = False
+    # The file's text or name contains the query (search.py, exact matches).
+    exact: bool = False
     # Near-duplicate files collapsed under this one (see search.py).
     similar: list[Hit] = field(default_factory=list)
 
@@ -239,6 +278,8 @@ class Store:
                 self.set_meta("dim", str(EMBED_DIM))
                 self.set_meta("created_at", str(time.time()))
                 self.set_meta("processing_generation", str(config.PROCESSING_GENERATION))
+                if fts_available(self.db):
+                    self.db.execute(FTS_SCHEMA)
         else:
             self._check_existing(tables)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(files)")}
@@ -250,6 +291,176 @@ class Store:
                     self.db.execute(f"ALTER TABLE files ADD COLUMN {col} {decl}")
         self._sig_col = "f.sig" if "sig" in cols or self._has_column("files", "sig") else "NULL"
         self._gen_col = "gen" if "gen" in cols or self._has_column("files", "gen") else "NULL"
+        self.fts = False  # chunk writes keep the FTS index up to date
+        self._fts_setup()
+
+    def _fts_setup(self) -> None:
+        """Decide whether this connection keeps and reads the FTS index. A
+        writer creates it in an index made before it existed (filled in
+        later by fill_fts()); a writer whose SQLite lacks FTS5 leaves it out
+        of date, so it records that the index must be rebuilt."""
+        has_table = self._has_table(FTS_TABLE)
+        supported = fts_available(self.db)
+        if self.readonly:
+            self.fts = has_table and supported
+            return
+        with contextlib.suppress(sqlite3.OperationalError):  # busy: next time
+            if supported and not has_table:
+                with self.transaction():
+                    self.db.execute(FTS_SCHEMA)
+                    self._fts_mark_gap(0)
+                has_table = True
+            elif not supported and has_table and self.get_meta("fts_reset") is None:
+                with self.transaction():
+                    self.set_meta("fts_reset", "1")
+            if supported and has_table and self.get_meta("fts_reset") is not None:
+                with self.transaction():
+                    self.db.execute(f"INSERT INTO {FTS_TABLE}({FTS_TABLE}) VALUES('delete-all')")
+                    self._fts_mark_gap(0)
+                    self.delete_meta("fts_reset")
+        self.fts = supported and has_table and self.get_meta("fts_reset") is None
+
+    def _has_table(self, name: str) -> bool:
+        return (
+            self.db.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone()
+            is not None
+        )
+
+    def _fts_mark_gap(self, pos: int) -> None:
+        """Record that the chunks after id `pos`, up to the last one now, are
+        not in the FTS index. Call inside a transaction."""
+        (end,) = self.db.execute("SELECT COALESCE(MAX(id), 0) FROM chunks").fetchone()
+        if end > pos:
+            self.set_meta("fts_pos", str(pos))
+            self.set_meta("fts_end", str(end))
+        else:
+            self.delete_meta("fts_pos")
+            self.delete_meta("fts_end")
+
+    def fts_gap(self) -> tuple[int, int] | None:
+        """(pos, end): chunks with pos < id <= end are not in the FTS index
+        yet; None when every chunk is."""
+        pos, end = self.get_meta("fts_pos"), self.get_meta("fts_end")
+        if pos is None or end is None or int(pos) >= int(end):
+            return None
+        return int(pos), int(end)
+
+    def exact_state(self) -> str:
+        """ "ready", "building" (an update fills in the older chunks) or
+        "unavailable" (this SQLite has no FTS5 trigram tokenizer)."""
+        if not fts_available(self.db):
+            return "unavailable"
+        if not self.fts or self.get_meta("fts_reset") is not None or self.fts_gap():
+            return "building"
+        return "ready"
+
+    def _fts_live(self) -> tuple[str, list[int]]:
+        """An SQL condition on chunk `id` true for the chunks that are (or
+        are to be) in the FTS index now: those outside the gap."""
+        gap = self.fts_gap()
+        if gap is None:
+            return "1", []
+        return "(id <= ? OR id > ?)", list(gap)
+
+    def fill_fts(self, max_seconds: float | None = None, quiet: bool = True) -> bool:
+        """Add the chunks of the gap to the FTS index, in short transactions
+        (an interrupted run keeps what is done). True when none is left."""
+        if self.readonly or not self._fts_writes():
+            return True
+        gap = self.fts_gap()
+        if gap is None:
+            return True
+        from tqdm import tqdm
+
+        start = time.monotonic()
+        pos, end = gap
+        bar = tqdm(
+            total=end - pos, disable=quiet, desc="Exact-match index", file=sys.stderr,
+            delay=1.0, dynamic_ncols=True, leave=False,
+        )  # fmt: skip
+        try:
+            while pos < end:
+                if max_seconds is not None and time.monotonic() - start > max_seconds:
+                    return False
+                with self.transaction():
+                    gap = self.fts_gap()
+                    if gap is None:
+                        return True
+                    pos, end = gap
+                    r = self.db.execute(
+                        "SELECT id FROM chunks WHERE id > ? AND id <= ? ORDER BY id "
+                        "LIMIT 1 OFFSET ?",
+                        (pos, end, FTS_BATCH - 1),
+                    ).fetchone()
+                    upto = end if r is None else r[0]
+                    self.db.execute(
+                        f"INSERT INTO {FTS_TABLE}(rowid, text) SELECT id, text FROM chunks "
+                        "WHERE id > ? AND id <= ?",
+                        (pos, upto),
+                    )
+                    if upto >= end:
+                        self.delete_meta("fts_pos")
+                        self.delete_meta("fts_end")
+                    else:
+                        self.set_meta("fts_pos", str(upto))
+                bar.update(upto - pos)
+                pos = upto
+        finally:
+            bar.close()
+        return True
+
+    def _fts_writes(self) -> bool:
+        """Whether chunk writes must update the FTS index. Call inside a
+        transaction: another process may have created the table since this
+        one opened the index."""
+        if not self.fts and not self.readonly and fts_available(self.db):
+            self.fts = self._has_table(FTS_TABLE) and self.get_meta("fts_reset") is None
+        return self.fts
+
+    def _fts_delete(self, where: str, params: Iterable) -> None:
+        """Take the chunks matching `where` out of the FTS index (before they
+        are deleted). Call inside a transaction."""
+        if not self._fts_writes():
+            return
+        live, more = self._fts_live()
+        self.db.execute(
+            f"INSERT INTO {FTS_TABLE}({FTS_TABLE}, rowid, text) SELECT 'delete', id, text "
+            f"FROM chunks WHERE ({where}) AND {live}",
+            [*params, *more],
+        )
+
+    def exact_chunks(self, needle: str) -> set[int] | None:
+        """Ids of the chunks whose text contains `needle` (3 or more
+        characters), ignoring case; None when this SQLite cannot use the FTS
+        index. Chunks the FTS index does not hold yet are read directly."""
+        if not fts_available(self.db):
+            return None
+        fold = needle.casefold()
+        # SQLite's LIKE ignores case only for ASCII letters: also try the
+        # common case forms of other letters.
+        pats = {f"%{v}%" for v in (needle, needle.lower(), needle.upper(), needle.capitalize())}
+        rows: dict[int, str] = {}
+        rebuild = self.get_meta("fts_reset") is not None
+        if self.fts and not rebuild:
+            gap = self.fts_gap()
+            for pat in pats:
+                rows.update(
+                    self.db.execute(
+                        f"SELECT rowid, text FROM {FTS_TABLE} WHERE text LIKE ?", (pat,)
+                    ).fetchall()
+                )
+            scan, params = ("id > ? AND id <= ?", list(gap)) if gap else (None, [])
+        else:
+            scan, params = "1", []
+        if scan is not None:
+            for pat in pats:
+                rows.update(
+                    self.db.execute(
+                        f"SELECT id, text FROM chunks WHERE {scan} AND text LIKE ?",
+                        [*params, pat],
+                    ).fetchall()
+                )
+        return {i for i, t in rows.items() if t and fold in t.casefold()}
 
     def _check_existing(self, tables: set[str]) -> None:
         """Refuse files that are not anygrep indexes (without writing to
@@ -457,6 +668,7 @@ class Store:
             for i in range(0, len(ids), 500):
                 part = ids[i : i + 500]
                 q = ",".join("?" * len(part))
+                self._fts_delete(f"file_id IN ({q})", part)
                 self.db.execute(f"DELETE FROM chunks WHERE file_id IN ({q})", part)
                 self.db.execute(f"DELETE FROM files WHERE id IN ({q})", part)
         return len(ids)
@@ -481,6 +693,7 @@ class Store:
         transaction."""
         old = self.db.execute("SELECT id FROM files WHERE path=?", (path,)).fetchone()
         if old:
+            self._fts_delete("file_id=?", (old[0],))
             self.db.execute("DELETE FROM chunks WHERE file_id=?", (old[0],))
             self.db.execute("DELETE FROM files WHERE id=?", (old[0],))
         cur = self.db.execute(
@@ -505,11 +718,24 @@ class Store:
             rows.append(
                 (file_id, c.ord, c.page, c.line_start, c.line_end, c.text, vec_to_blob(c.vec))
             )
+        if not rows:
+            return
+        fts = self._fts_writes()
+        if fts:
+            # New rows get ids above the largest one (SQLite's rowid rule).
+            (before,) = self.db.execute("SELECT COALESCE(MAX(id), 0) FROM chunks").fetchone()
         self.db.executemany(
             "INSERT INTO chunks(file_id, ord, page, line_start, line_end, text, vec) "
             "VALUES(?,?,?,?,?,?,?)",
             rows,
         )
+        if fts:
+            live, more = self._fts_live()
+            self.db.execute(
+                f"INSERT INTO {FTS_TABLE}(rowid, text) SELECT id, text FROM chunks "
+                f"WHERE id > ? AND {live}",
+                [before, *more],
+            )
 
     def set_status(self, file_id: int, status: str, note: str | None) -> None:
         self.db.execute("UPDATE files SET status=?, note=? WHERE id=?", (status, note, file_id))

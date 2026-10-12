@@ -65,8 +65,10 @@ class Hit:
     is a one-line excerpt around the query words ("" for images, where
     --json has null) and `text`
     the whole matching chunk. `weak` marks a result below the relevance
-    cutoff (only returned with `weak=True`). `similar` lists the
-    near-duplicate files collapsed under this one."""
+    cutoff (only returned with `weak=True`). `exact` marks a file whose
+    text or name contains the query as typed (ignoring case); these come
+    first. `similar` lists the near-duplicate files collapsed under this
+    one."""
 
     path: str
     type: str
@@ -78,6 +80,7 @@ class Hit:
     snippet: str = ""
     text: str | None = field(default=None, repr=False)
     similar: tuple[Hit, ...] = field(default=(), repr=False)
+    exact: bool = False
 
 
 @dataclass(frozen=True)
@@ -311,6 +314,7 @@ class Index:
             collapse=collapse,
             image_queries=image_queries,
             prefixes=prefixes,
+            exact=text,
         )
         return [_public_hit(h, text) for h in hits]
 
@@ -533,4 +537,5 @@ def _public_hit(h: _StoreHit, query: str | None) -> Hit:
         snippet=snippet(h.text, query, SNIPPET_COLS),
         text=h.text,
         similar=tuple(_public_hit(x, query) for x in h.similar),
+        exact=h.exact,
     )

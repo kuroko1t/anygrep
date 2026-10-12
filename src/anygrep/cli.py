@@ -709,7 +709,11 @@ def _print_human(hits, query: str | None, color: bool, fallback: bool = False) -
             loc += f":{h.line_start}"
         tag = "" if h.kind == "text" else f"  [{h.kind}]"
         weak = _style("  (weak)", "33", color) if h.weak else ""
-        print(f"{i:>2}  {h.score:.3f}  {_style(loc, '1', color)}{_style(tag, '2', color)}{weak}")
+        exact = _style("  (exact)", "32", color) if h.exact else ""
+        print(
+            f"{i:>2}  {h.score:.3f}  {_style(loc, '1', color)}{_style(tag, '2', color)}"
+            f"{exact}{weak}"
+        )
         snip = snippet(h.text, query, width)
         if snip:
             print("      " + _style(snip, "2", color))
@@ -764,6 +768,7 @@ def _json_entry(h, query: str | None) -> dict:
         "page": h.page,
         "score": round(h.score, 4),
         "weak": h.weak,
+        "exact": h.exact,
         "snippet": snippet(h.text, query, JSON_SNIPPET_COLS) or None,
     }
 
@@ -1070,6 +1075,9 @@ def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int |
             return EXIT_ERROR
     if removed:  # cheap updates: deleted files go (touches and moves are done)
         store.delete_files(removed)
+    # An index made before exact matching: fill in its table (within the
+    # budget when no progress is shown; the next run continues).
+    store.fill_fts(max_seconds=None if visible else args.index_budget, quiet=not visible)
     if not todo:
         return None
 
@@ -1231,7 +1239,7 @@ def _search(args, store) -> int:
                 per_file=not args.chunks, exclude_path=exclude,
                 query_kind="text" if query_text is not None else "image",
                 budget=budget, hide_weak=hide_weak, collapse=collapse,
-                image_queries=image_queries, prefixes=args.scope,
+                image_queries=image_queries, prefixes=args.scope, exact=query_text,
             )  # fmt: skip
 
         hits = find(n, hide_weak=not args.weak)
@@ -1328,6 +1336,7 @@ def cmd_status(args) -> int:
                 throughput_factor(store) if store.get_meta(CALIB_KEY) is not None else None
             ),
             outdated_files=store.count_stale(),
+            exact_match=store.exact_state(),
         )
         if args.problems:
             info["problems"] = [
@@ -1378,6 +1387,13 @@ def cmd_status(args) -> int:
             "Last indexed: "
             + time.strftime("%Y-%m-%d %H:%M", time.localtime(info["last_indexed_at"]))
         )
+    if info["exact_match"] == "unavailable":
+        print(
+            f"Exact matches: off (SQLite {sqlite3.sqlite_version} has no FTS5 trigram "
+            "tokenizer; it needs 3.34 or later); searches use meaning only"
+        )
+    elif info["exact_match"] == "building":
+        print(f"Exact matches: the index for them is not complete; `{_hint('index')}` finishes it")
     if info["outdated_files"]:
         print(
             f"Outdated: {info['outdated_files']:,} files indexed by an older version of anygrep; "

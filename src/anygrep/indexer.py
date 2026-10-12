@@ -775,6 +775,7 @@ def update_index(
     writer lock held: remember the text extensions, index `roots` and record
     the image budget once every image has it."""
     store.set_meta("text_exts", ",".join(sorted(opts.extra_text_exts)))
+    store.fill_fts(quiet=opts.quiet)  # an index made before exact matching
     rep = run_index(store, roots, opts, get_embedder, calibrate=calibrate)
     rep.removed += dropped
     if opts.images and not rep.interrupted:

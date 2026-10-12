@@ -101,6 +101,10 @@ changed). When `image` is a file in the index, that file is left out of the resu
 - `chunks=True`: return the best chunks rather than the best files, so a file can appear more than
   once.
 
+A text `query` of 3 or more characters also finds the files whose text or path contains it as typed,
+ignoring case ([exact matches](usage.md#exact-matches)). They come first, best score first, with
+`Hit.exact` set, and are returned even when their score is below the cutoff.
+
 `search()` only reads the index; unlike the command it does not index new files first. Call `update()`
 for that. When nothing passes the cutoff the list is empty, and so it is for a new or empty index; the
 command's "closest results" fallback is `search(..., weak=True, k=3)`. On an index with nothing in
@@ -125,6 +129,7 @@ A frozen dataclass.
 | `snippet` | one line around the query words, as in `--json` (`""` for images, where `--json` has `null`) |
 | `text` | the whole text of the matching chunk (`None` for images) |
 | `similar` | near-duplicate files grouped under this one, as `Hit`s |
+| `exact` | the file's text or path contains the query as typed (these come first) |
 
 ## Errors
 

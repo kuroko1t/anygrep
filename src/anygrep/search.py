@@ -208,6 +208,7 @@ def search(
     collapse: bool = False,
     image_queries: dict[int, np.ndarray] | None = None,
     prefixes: Sequence[str] | None = None,
+    exact: str | None = None,
 ) -> list[Hit]:
     """Rank chunks by cosine similarity. Every hit carries a `weak` flag
     (see thresholds.py); with `hide_weak` weak chunks are left out. With
@@ -219,14 +220,90 @@ def search(
     a matching query vector, cross-budget image results are marked weak:
     their score distribution has not been calibrated. `prefixes` are the
     folders (or files) of the scope: only their vectors are read from the
-    index (`scope` still decides; see load_prefixes())."""
+    index (`scope` still decides; see load_prefixes()).
+
+    `exact` is the text query: files whose text or name contains it (see
+    exact_needle()) come first, best score first, marked `exact` and never
+    weak, whatever their score."""
     if n <= 0:
         return []
     with store.snapshot():
         return _search(
             store, qvec, n, kinds, scope, per_file, exclude_path, query_kind, budget,
-            hide_weak, collapse, image_queries, prefixes,
+            hide_weak, collapse, image_queries, prefixes, exact,
         )  # fmt: skip
+
+
+# Exact matches: a query of at least this many characters (shorter ones
+# would match almost everything) is also looked up as a plain string in the
+# chunk text and in the file names. Scores are cosines (at most 1), so the
+# boost puts exact matches above every other result without changing their
+# order among themselves.
+EXACT_MIN_CHARS = 3
+_EXACT_BOOST = 10.0
+
+
+def exact_needle(query: str | None) -> str | None:
+    """The string exact matching looks for, or None for no exact matching."""
+    if query is None:
+        return None
+    q = query.strip()
+    return q if len(q) >= EXACT_MIN_CHARS else None
+
+
+def _relative_names(paths: Sequence[str], bases: Sequence[str]) -> list[str]:
+    """Each path relative to the longest of `bases` it is under, with /
+    separators and folded case (its file name when it is a base itself or
+    under none)."""
+    folded = sorted({os.path.normcase(b.rstrip("/\\")) for b in bases}, key=len, reverse=True)
+    out = []
+    for p in paths:
+        q = os.path.normcase(p)
+        rel = None
+        for b in folded:
+            if q.startswith(b + os.sep):
+                rel = p[len(b) + 1 :]
+                break
+        if rel is None:
+            rel = os.path.basename(p)
+        out.append(rel.replace(os.sep, "/").casefold())
+    return out
+
+
+def _exact_rows(
+    store: Store,
+    needle: str,
+    v: Vectors,
+    file_ok: np.ndarray,
+    scores: np.ndarray,
+    prefixes: Sequence[str] | None,
+    per_file: bool,
+) -> np.ndarray:
+    """Rows to rank as exact matches: per file the best chunk containing the
+    needle, or its best chunk when only its name does (with per_file false,
+    every chunk containing it)."""
+    rows = np.zeros(len(v.ids), bool)
+    ids = store.exact_chunks(needle)
+    if ids is None:  # no FTS5 in this SQLite: meaning only
+        return rows
+    text_rows = (
+        np.isin(v.ids, np.fromiter(ids, np.int64, len(ids))) if ids else rows.copy()
+    ) & file_ok[v.file_of]
+    fold = needle.casefold().replace("\\", "/")
+    bases = list(prefixes) if prefixes else store.roots()
+    names = _relative_names(v.paths, bases)
+    by_name = np.fromiter(
+        (ok and fold in name for ok, name in zip(file_ok, names, strict=True)), bool, len(names)
+    )
+    with_text = np.zeros(len(v.paths), bool)
+    with_text[v.file_of[text_rows]] = True
+    cand = np.flatnonzero(text_rows | (by_name & ~with_text)[v.file_of])
+    if len(cand) == 0:
+        return rows
+    cand = cand[np.argsort(-scores[cand], kind="stable")]
+    _, first = np.unique(v.file_of[cand], return_index=True)
+    rows[cand[first]] = True
+    return rows if per_file else rows | text_rows
 
 
 def load_prefixes(prefixes: Sequence[str] | None) -> list[str] | None:
@@ -278,7 +355,7 @@ class _Ranked:
 
 def _search(
     store, qvec, n, kinds, scope, per_file, exclude_path, query_kind, budget, hide_weak,
-    collapse, image_queries, prefixes=None,
+    collapse, image_queries, prefixes=None, exact=None,
 ) -> list[Hit]:  # fmt: skip
     v = load_scope(store, kinds, prefixes)
     if len(v.ids) == 0:
@@ -306,24 +383,31 @@ def _search(
                 scores[sel] = v.mat[sel] @ np.asarray(image_q, np.float32)
             weak[sel] = weak_mask(scores[sel], row_kinds[sel], query_kind, result_budget, image_q)
     keep = ~weak if hide_weak else np.ones(len(v.ids), bool)
+    # Paths are tested once per file, not once per chunk.
+    file_ok = np.ones(len(v.paths), bool)
     if scope is not None or exclude_path:
-        # Paths are tested once per file, not once per chunk.
-        ok = np.fromiter(
+        file_ok = np.fromiter(
             ((scope is None or scope(p)) and p != exclude_path for p in v.paths),
             bool,
             len(v.paths),
         )
-        keep &= ok[v.file_of]
-    scores = np.where(keep, scores, -np.inf)
-    order = _Ranked(scores, 4 * n)
+    exact_rows = np.zeros(len(v.ids), bool)
+    needle = exact_needle(exact) if query_kind == "text" else None
+    if needle is not None:
+        exact_rows = _exact_rows(store, needle, v, file_ok, scores, prefixes, per_file)
+        keep |= exact_rows
+        weak &= ~exact_rows
+    keep &= file_ok[v.file_of]
+    rank = np.where(keep, scores + _EXACT_BOOST * exact_rows, -np.inf)
+    order = _Ranked(rank, 4 * n)
     if per_file and collapse:
-        groups = _collapsed(store, order, scores, v, n)
+        groups = _collapsed(store, order, rank, v, n)
     else:
         groups = []
         seen_files: set[int] = set()
         for pos in range(len(order)):
             i = order[pos]
-            if not np.isfinite(scores[i]):
+            if not np.isfinite(rank[i]):
                 break
             if per_file:
                 f = int(v.file_of[i])
@@ -343,7 +427,7 @@ def _search(
         f = int(v.file_of[i])
         return Hit(
             float(scores[i]), v.paths[f], v.kinds[f], page, ls, le, text, int(v.ids[i]),
-            weak=bool(weak[i]),
+            weak=bool(weak[i]), exact=bool(exact_rows[i]),
         )  # fmt: skip
 
     hits = []

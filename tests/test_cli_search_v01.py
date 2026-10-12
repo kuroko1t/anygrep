@@ -23,8 +23,8 @@ from anygrep.store import Store, acquire_writer_lock, lock_path, readonly_uri
 from .conftest import jsonl
 
 JSON_KEYS = [
-    "rank", "path", "type", "line_start", "line_end", "page", "score", "weak", "snippet",
-    "similar",
+    "rank", "path", "type", "line_start", "line_end", "page", "score", "weak", "exact",
+    "snippet", "similar",
 ]  # fmt: skip
 NONSENSE = "qwzx plorb fnord"
 
@@ -712,7 +712,7 @@ def test_tty_format(env, notes: Path, cutoff, capsys, tty) -> None:
     code, out, _ = run(capsys, "bread", str(notes), "-t", "text")
     assert code == 0
     first = out.splitlines()[0]
-    assert re.search(r"bread\.md:1$", first) and not re.search(r":\d+-\d+", out)
+    assert re.search(r"bread\.md:1  \(exact\)$", first) and not re.search(r":\d+-\d+", out)
     code, out, err = run(capsys, NONSENSE, str(notes))
     assert code == 1 and out.startswith(cli.NO_STRONG) and "(weak)" in out
     code, out, err = run(capsys, NONSENSE, str(notes), "-t", "image", "-g", "*.nothing")

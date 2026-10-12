@@ -14,6 +14,13 @@ All notable changes to anygrep are listed here. The format follows
   resumable like any other change, instead of needing `anygrep reset`. A search that does not update
   them says so in one line on stderr; `anygrep status` shows the count and the Python API has
   `Index.update_pending`. A different model revision still needs a reset.
+- Exact matches. A text query of 3 or more characters is also looked up as a plain string (ignoring
+  case) in the indexed text and the file paths, so an invoice number, an error code or a file name finds
+  the file that contains it. Those files always come first, best score first, even below the relevance
+  cutoff, marked `(exact)` on a terminal, `"exact": true` in `--json` and `Hit.exact` in the Python API.
+  It uses an SQLite FTS5 trigram index (SQLite 3.34 or later; without it searches use meaning only and
+  `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;
+  the index file grows by about the size of the text it holds (47% in a test with 2,000 notes).
 
 ### Changed
 
