@@ -23,7 +23,7 @@ see [python-api.md](python-api.md).
 
 ### Uninstalling
 
-Run `pipx uninstall anygrep`, then delete the index and model files (`anygrep status` shows both
+Run `pipx uninstall anygrep` (or `uv tool uninstall anygrep`), then delete the index and model files (`anygrep status` shows both
 paths). They live in `~/.local/share/anygrep` and `~/.cache/anygrep` on Linux,
 `~/Library/Application Support/anygrep` and `~/Library/Caches/anygrep` on macOS, and
 `%LOCALAPPDATA%\anygrep` on Windows. `anygrep reset` deletes only the index.
@@ -309,8 +309,11 @@ it must match none of the excludes.
 
 ## Offline use and mirrors
 
-Everything runs locally and there is no telemetry (onnxruntime's own usage telemetry is switched off). The only network access is the one-time model download from huggingface.co. It is pinned to a fixed
-revision and checked against SHA-256 hashes.
+Everything runs locally and anygrep has no telemetry. The only network access is the one-time model
+download from huggingface.co. It is pinned to a fixed revision and checked against SHA-256 hashes.
+
+onnxruntime has its own usage telemetry: the 1.31 Linux build sends it to Microsoft, and the Windows
+build logs it through ETW. anygrep switches it off before loading the model.
 
 - `HF_ENDPOINT` points the download at a mirror.
 - To work fully offline, run `anygrep model --download` once on a connected machine, or copy the files
@@ -340,5 +343,3 @@ anygrep "screenshot of an error about disk space" --db ~/anygrep-demo/index.sqli
 
 Generate it outside the clone: anygrep honours `.gitignore`, and the repository ignores generated demo
 files.
-It also writes `query.png`, a chart to try `anygrep --image query.png` with; the folder's
-`.anygrepignore` keeps it out of the index.

@@ -8,7 +8,6 @@
 # .gitignore would hide the corpus from anygrep. The corpus is indexed before
 # recording; the GIF shows only searches. The wait for each command's output
 # (mostly loading the model) plays 6x faster; everything else is real time.
-# scripts/make_demo_figure.py draws demo/image-search.png from the same corpus.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 work="${1:-$(mktemp -d)}"
@@ -31,5 +30,3 @@ agg --font-family "DejaVu Sans Mono" --font-size 20 --line-height 1.3 \
     --theme monokai --idle-time-limit 4 --last-frame-duration 5 \
     "$cast.fast" "$repo/demo/anygrep.gif"
 echo "Wrote $repo/demo/anygrep.gif"
-python "$repo/scripts/make_demo_figure.py" "$work/demo-corpus" "$ANYGREP_DB" \
-    "$repo/demo/image-search.png"

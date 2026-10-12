@@ -488,16 +488,6 @@ def main() -> None:
         p = out / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         im.save(p, quality=90) if p.suffix == ".jpg" else im.save(p)
-    # A query image for `anygrep --image query.png`. It sits in the corpus folder
-    # so the demo needs no `../`, and .anygrepignore keeps it out of the index.
-    q = bar_chart(
-        "Water usage per month (m3)",
-        [9, 8, 9, 10, 12, 14, 15, 15, 12, 10, 9, 9],
-        months,
-        (220, 120, 40),
-    )
-    q.save(out / "query.png")
-    (out / ".anygrepignore").write_text("/query.png\n", encoding="utf-8")
     print(f"Wrote {len(NOTES)} notes, {len(PDFS)} PDFs, {len(images)} images to {out}")
 
 
