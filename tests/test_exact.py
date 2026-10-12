@@ -235,6 +235,8 @@ def test_cli_marks_exact_matches(env, docs: Path, cutoff, capsys, tty, monkeypat
     monkeypatch.setattr(store, "_fts_ok", False)
     code, out, _ = run(capsys, "status")
     assert "Exact matches: off" in out
+    code, out, _ = run(capsys, "-h")
+    assert code == 0 and "marked (exact)" in out
 
 
 def test_api_hit_exact(tmp_path: Path, docs: Path, env, cutoff, monkeypatch) -> None:

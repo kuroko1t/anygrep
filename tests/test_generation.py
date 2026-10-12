@@ -150,6 +150,27 @@ def test_search_notes_outdated_files(env, corpus: Path, monkeypatch, capsys) -> 
         st.close()
 
 
+def test_outdated_notes_over_budget_and_everywhere(env, corpus: Path, monkeypatch, capsys):
+    """A search that cannot index again within its budget says only that the
+    files are outdated, not that they are new; with --everywhere the count
+    is for the whole index."""
+    assert cli.main(["index", "-q", str(corpus)]) == 0
+    capsys.readouterr()
+    bump(monkeypatch, "text")
+    monkeypatch.setenv("ANYGREP_INDEX_BUDGET", "0")
+    assert cli.main(["bread", str(corpus)]) == 0
+    err = capsys.readouterr().err
+    assert "not indexed yet" not in err
+    assert "files here were indexed by an older version" in err
+    (corpus / "notes" / "new.md").write_text("bread pudding\n", encoding="utf-8")
+    assert cli.main(["bread", str(corpus)]) == 0
+    err = capsys.readouterr().err
+    assert "has new or changed files not indexed yet" in err
+    assert cli.main(["--everywhere", "bread"]) == 0
+    err = capsys.readouterr().err
+    assert "files in the index were indexed by an older version" in err and " here " not in err
+
+
 @pytest.fixture
 def api_index(tmp_path: Path, monkeypatch, env: FakeEmbedder):
     monkeypatch.setattr(embedder, "embedder_factory", lambda threads, quiet=True: lambda v: env)
