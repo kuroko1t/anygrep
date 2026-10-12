@@ -21,8 +21,9 @@ All notable changes to anygrep are listed here. The format follows
   and `Hit.exact` in the Python API. Queries of 3 or 4 ASCII letters match whole words only (a letter or digit of
   any script continues a word; `_`, `-` and Chinese, Japanese or Korean characters do not), and a
   query of plain words found in more than 10 of the files searched (and more than 5% of them), or
-  in more than half of a scope of 3 or more files, gives no exact matches. A query with a digit or
-  another symbol (an ID, an error code, a file name) is always matched.
+  in more than half of a scope of 3 or more files, gives no exact matches (a hyphen inside a word,
+  as in `e-mail`, keeps it a plain word). A query with a digit or another symbol (an ID, an error
+  code, a file name) is always matched.
   It uses an SQLite FTS5 trigram index (SQLite 3.34 or later; without it searches use meaning only and
   `anygrep status` says so). Existing indexes get it on the next update, without re-embedding anything;
   the index file grows by about a third to a half (47% in a test with 2,000 notes).

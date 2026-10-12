@@ -343,6 +343,12 @@ def test_ids_are_always_matched_common_words_are_not(
         (small / f"s{i}.txt").write_text(f"The note {i} with code Q-77{i} and the end.\n")
     (small / "s0.txt").write_text("The kayak and the paddle, code Q-770.\n")
     (small / "s1.txt").write_text("The kayak trip and the lake, code Q-771.\n")
+    words = corpus / "words"
+    words.mkdir()
+    for i in range(5):
+        (words / f"w{i}.txt").write_text(
+            f"नोट ที่นี่ İstanbul follow-up e-mail, entry {i}.\n", encoding="utf-8"
+        )
     st = Store(tmp_path / "idx.sqlite")
     index(st, corpus, fake_embedder)
 
@@ -365,8 +371,14 @@ def test_ids_are_always_matched_common_words_are_not(
     # One file searched: its words count, also common ones.
     assert exact("the", small / "s2.txt") == ["s2.txt"]
     assert exact("the", small / "s2.txt", small / "s3.txt") == ["s2.txt", "s3.txt"]
-    assert search_mod.is_plain_words("don't stop")
-    for q in ("e-tax", "v2.14.3", "report.pdf", "6,850 kwh", "a_b"):
+    # Words with combining marks (Hindi, Thai, Turkish "İ" once folded) or
+    # a hyphen inside are plain words too: in every file of "words", none.
+    for q in ("नोट", "ที่นี่", "İstanbul", "follow-up", "e-mail"):
+        assert exact(q, words) == [], q
+        assert exact(q, words / "w1.txt") == ["w1.txt"], q
+    for q in ("don't stop", "e-tax", "follow-up", "नोट", "مَرْحَبًا", "i\u0307stanbul"):
+        assert search_mod.is_plain_words(q), q
+    for q in ("v2.14.3", "report.pdf", "6,850 kwh", "a_b", "q-7", "-x", "a--b"):
         assert not search_mod.is_plain_words(q), q
 
 

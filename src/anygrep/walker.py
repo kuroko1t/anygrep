@@ -39,9 +39,10 @@ SKIP_DIRS = frozenset(
 # Document formats people expect a search tool to read, which anygrep cannot
 # read yet. Skipped like any unsupported file, but counted
 # (WalkStats.documents) so that a run can say why they are not found.
+# Not .pages, .numbers or .key: on macOS those are usually folders (bundles),
+# and .key is also the usual name of a TLS or SSH private key.
 DOCUMENT_EXTS = frozenset(
     {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".odt", ".ods", ".odp", ".rtf", ".epub"}
-    | {".pages", ".numbers", ".key"}
 )
 
 

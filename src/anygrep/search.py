@@ -282,10 +282,23 @@ def exact_needle(query: str | None) -> str | None:
     return q if len(q) >= EXACT_MIN_CHARS else None
 
 
+def _is_letter(c: str) -> bool:
+    # Letters of any script, and the combining marks some scripts (Hindi,
+    # Thai, Arabic vowel marks, the dot that folding adds to Turkish "İ")
+    # write words with.
+    return c.isalpha() or unicodedata.category(c)[0] == "M"
+
+
+# A hyphen inside a word ("e-mail", "follow-up") keeps it a plain word.
+_WORD_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011](?=[^\W\d_])")
+
+
 def is_plain_words(needle: str) -> bool:
-    """True for a query of letters (any script), spaces and apostrophes
-    only: a word or phrase, not an ID, a number or a file name."""
-    return all(c.isalpha() or c.isspace() or c in "'\u2019" for c in needle)
+    """True for a query of letters (any script), spaces, apostrophes and
+    hyphens between letters only: a word or phrase, not an ID, a number or
+    a file name."""
+    needle = _WORD_HYPHEN.sub("", needle)
+    return all(_is_letter(c) or c.isspace() or c in "'\u2019" for c in needle)
 
 
 def too_common(needle: str, matched: int, searched: int) -> bool:

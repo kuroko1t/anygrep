@@ -1,4 +1,4 @@
-"""Skipped Office documents: one line on stderr when new files are scanned."""
+"""Skipped documents (.docx, .epub, ...): one line on stderr when new files are scanned."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import anygrep
 from anygrep import cli, embedder
 from anygrep.walker import WalkStats, walk
 
-LINE = "Office documents"
+LINE = "documents ("
 
 
 def run(capsys, *argv: str) -> tuple[int, str, str]:
@@ -24,7 +24,8 @@ def add_documents(folder: Path) -> None:
     for name in ("a.docx", "b.DOCX", "c.xlsx", "d.pptx", "e.odt"):
         (folder / name).write_bytes(b"PK\x03\x04 not a real document")
     (folder / "~$a.docx").write_bytes(b"lock")  # Office's lock file: not counted
-    for name in ("f.zip", "g.mp4", "h.exe"):  # other unsupported files: not counted
+    # Other unsupported files are not counted, nor .key (private keys too).
+    for name in ("f.zip", "g.mp4", "h.exe", "server.key"):
         (folder / name).write_bytes(b"\x00\x01")
 
 
@@ -44,11 +45,11 @@ def test_documents_note_wording() -> None:
     assert cli._documents_note(stats) is None
     stats.documents = {".docx": 1}
     assert cli._documents_note(stats) == (
-        "anygrep: skipped 1 Office document (.docx); this format is not supported yet"
+        "anygrep: skipped 1 document (.docx); this format is not supported yet"
     )
     stats.documents = {".xlsx": 3, ".docx": 9, ".epub": 1, ".pptx": 3}
     assert cli._documents_note(stats) == (
-        "anygrep: skipped 16 Office documents (.docx, .pptx, .xlsx, ...); "
+        "anygrep: skipped 16 documents (.docx, .pptx, .xlsx, ...); "
         "these formats are not supported yet"
     )
 
@@ -56,7 +57,7 @@ def test_documents_note_wording() -> None:
 def test_index_says_once_per_run_with_new_files(env, corpus: Path, capsys) -> None:
     add_documents(corpus / "office")
     want = (
-        "anygrep: skipped 5 Office documents (.docx, .odt, .pptx, ...); "
+        "anygrep: skipped 5 documents (.docx, .odt, .pptx, ...); "
         "these formats are not supported yet"
     )
     code, out, err = run(capsys, "index", str(corpus))
@@ -77,9 +78,15 @@ def test_index_of_documents_only(env, tmp_path: Path, capsys) -> None:
     add_documents(folder)
     _, _, err = run(capsys, "index", str(folder))
     assert "No files to index" in err and LINE in err
+    # Nothing else to index: every run says why (documented in usage.md).
+    _, _, err = run(capsys, "index", str(folder))
+    assert "No files to index" in err and LINE in err
     _, _, err = run(capsys, "index", str(folder / "a.docx"))
     assert "Skipped" in err and ".docx files are not supported yet." in err
     assert "--ext" not in err and LINE not in err
+    # A .key file named explicitly keeps the --ext hint.
+    _, _, err = run(capsys, "index", str(folder / "server.key"))
+    assert "use --ext .key to index it as plain text" in err and LINE not in err
 
 
 def test_search_says_it_only_when_indexing_new_files(env, corpus: Path, capsys) -> None:

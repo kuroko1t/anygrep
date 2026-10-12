@@ -372,7 +372,7 @@ def _documents_note(walk) -> str | None:
     shown = ", ".join(exts[:3]) + (", ..." if len(exts) > 3 else "")
     noun = "document" if count == 1 else "documents"
     these = "this format is" if len(exts) == 1 else "these formats are"
-    return f"anygrep: skipped {count:,} Office {noun} ({shown}); {these} not supported yet"
+    return f"anygrep: skipped {count:,} {noun} ({shown}); {these} not supported yet"
 
 
 def _index_summary(args, rep) -> int:

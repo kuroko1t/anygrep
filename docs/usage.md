@@ -128,12 +128,13 @@ started while another one runs exits with status 2, and a search searches the in
 - `node_modules`, `__pycache__`, virtualenvs, symlinks, binary files and empty files.
 - Files over the size limits: 20 MB text, 300 MB PDF, 80 MB image.
 - Files of other types, including Office and other document formats that are not supported yet:
-  `.docx .doc .xlsx .xls .pptx .ppt .odt .ods .odp .rtf .epub .pages .numbers .key`. When a run
-  (`anygrep index`, or the indexing before a search) finds new files to index, it also says how many
-  of these documents it skipped, in one line on stderr such as `anygrep: skipped 12 Office documents
-  (.docx, .xlsx); these formats are not supported yet`, so they are not taken for missing from the
-  results. A run with nothing new does not repeat it, `-q` leaves it out, and the results and exit
-  status do not change. Other unsupported files (code, archives, media) are not counted.
+  `.docx .doc .xlsx .xls .pptx .ppt .odt .ods .odp .rtf .epub`. When a run (`anygrep index`, or the
+  indexing before a search) finds new files to index, it also says how many of these documents it
+  skipped, in one line on stderr such as `anygrep: skipped 12 documents (.docx, .xlsx); these formats
+  are not supported yet`, so they are not taken for missing from the results. A run with nothing new
+  does not repeat it, unless the folder has nothing to index apart from such documents: then every
+  run says so. `-q` leaves it out, and the results and exit status do not change. Other unsupported
+  files (code, archives, media, Apple Pages, Numbers and Keynote files) are not counted.
 
 Files that cannot be read are recorded and retried after they change. Files that failed because of
 permissions or a model error, for example running out of memory, are retried on every run. Folders that
@@ -305,13 +306,14 @@ words (`budget` in `budgeting`). Two limits keep common words from flooding the 
   words, so it matches "run_script" and "run-script", and so do Chinese, Japanese and Korean
   characters, which are written without spaces next to Latin words ("runを実行"). Text is folded
   first, so full-width "ＲＵＮ" counts as `run`. File names follow the same rule.
-- A query of plain words (letters, spaces and apostrophes only) found in more than 10 of the files
+- A query of plain words (letters of any script, spaces, apostrophes and hyphens inside a word, as in
+  `e-mail` or `follow-up`) found in more than 10 of the files
   searched, and in more than 5% of them, is no clue to a particular file. Such a query (`the`,
   `and`, a word every note uses) gets no exact matches and is searched by meaning only. In a scope
   of 3 or more files, the same goes for plain words found in more than half of them (`the` in a
   folder of five notes).
 - A query with a digit or any other character, such as an ID, an error code or a file name
-  (`INV-2026-0412`, `e-Tax`, `report.pdf`), is always matched, however many files contain it: the
+  (`INV-2026-0412`, `v2.14`, `report.pdf`), is always matched, however many files contain it: the
   same order number in 12 related files still tells them from the rest.
 
 Shorter queries (1 or 2 characters, which includes many Japanese words such as `税金`) are searched by
