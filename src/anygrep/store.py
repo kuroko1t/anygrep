@@ -24,9 +24,10 @@ from . import config
 from .config import EMBED_DIM, MODEL_NAME, MODEL_REVISION
 from .errors import IndexMismatchError
 
-# Schema 2 added the FTS table for exact matches. anygrep 0.2 and earlier
-# would change the chunks without it, so they must refuse such an index;
-# a schema 1 index is moved to 2 by the first writer that opens it.
+# Schema 2 added the FTS table for exact matches. Development builds that
+# wrote schema 1 would change the chunks without it, so they must refuse
+# such an index; a schema 1 index is moved to 2 by the first writer that
+# opens it.
 SCHEMA_VERSION = 2
 OLDEST_SCHEMA = 1
 
@@ -394,8 +395,8 @@ class Store:
         else:
             self._check_existing(tables)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(files)")}
-        # Columns added after anygrep 0.1.0 (sig) and 0.2.0 (gen). A read-only
-        # open of an older index reads NULL for them.
+        # Columns added during development (sig, gen). A read-only open of an
+        # index made before them reads NULL for them.
         for col, decl in (("sig", "BLOB"), ("gen", "INTEGER")):
             if col not in cols and not readonly:
                 with contextlib.suppress(sqlite3.OperationalError):

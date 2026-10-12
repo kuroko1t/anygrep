@@ -322,11 +322,7 @@ never matches exactly.
 
 Exact matching uses SQLite's FTS5 full-text index with the trigram tokenizer, which needs SQLite 3.34 or
 later (Python's own `sqlite3` module has had it for years on most systems). Without it anygrep searches
-by meaning only, and `anygrep status` says so. An index made by an earlier version of anygrep gets the
-full-text table on the next `anygrep index` or search that indexes; until then, exact matches are found
-by reading the stored text, which is slower on a large index. Once this version has written to an
-index, anygrep 0.2 and earlier refuse it ("created by a newer anygrep"), because they would change it
-without keeping the full-text table.
+by meaning only, and `anygrep status` says so.
 
 ### Near-duplicates
 
