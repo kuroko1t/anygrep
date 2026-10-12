@@ -1,0 +1,120 @@
+[build-system]
+requires = ["hatchling>=1.26", "hatch-fancy-pypi-readme>=24.1"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anygrep"
+dynamic = ["version", "readme"]
+description = "Search your notes, PDFs and screenshots by meaning on the CPU, with one local multimodal model (EmbeddingGemma 2). No API key, no GPU."
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "kuroko1t" }]
+keywords = [
+    "semantic-search",
+    "search",
+    "embeddings",
+    "multimodal",
+    "embeddinggemma",
+    "onnx",
+    "cli",
+    "grep",
+    "pdf",
+    "images",
+    "notes",
+    "local-first",
+    "offline",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "numpy>=1.24",
+    "onnxruntime>=1.23",
+    "tokenizers>=0.20",
+    "pillow>=10.1",
+    "pypdfium2>=4.20",
+    "pathspec>=0.12",
+    "platformdirs>=3.0",
+    "tqdm>=4.60",
+    "certifi>=2023.7.22",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.5"]
+
+[project.scripts]
+anygrep = "anygrep.__main__:run"
+
+[project.urls]
+Homepage = "https://github.com/kuroko1t/anygrep"
+Source = "https://github.com/kuroko1t/anygrep"
+Issues = "https://github.com/kuroko1t/anygrep/issues"
+Changelog = "https://github.com/kuroko1t/anygrep/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/kuroko1t/anygrep#readme"
+
+[tool.hatch.version]
+path = "src/anygrep/__init__.py"
+
+# The README uses relative links so that they render on GitHub; PyPI gets absolute ones.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '!\[([^\]]*)\]\((?!https?://)([^)]+)\)'
+replacement = '![\1](https://raw.githubusercontent.com/kuroko1t/anygrep/main/\2)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?<!!)\[((?:[^\[\]]|!\[[^\]]*\]\([^)]*\))*)\]\((?!https?://|#)([^)]+)\)'
+replacement = '[\1](https://github.com/kuroko1t/anygrep/blob/main/\2)'
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src",
+    "tests",
+    "scripts/*.py",
+    "scripts/*.sh",
+    "scripts/*.ps1",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anygrep"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: needs the real model files (skipped when unavailable)"]

@@ -1,0 +1,55 @@
+name: Bug report
+description: Something does not work, crashes, or gives clearly wrong results.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead.
+      placeholder: |
+        anygrep "..." returned ... but I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, if you can share them. A small set of files that shows the problem helps a lot.
+      render: shell
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11 23H2, macOS 15.1 (Apple silicon), Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: Output of `python --version`, and how you installed anygrep (pipx, uv tool, uvx, pip).
+      placeholder: e.g. Python 3.12.4, installed with pipx
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: anygrep version
+      description: Output of `anygrep --version`.
+      placeholder: anygrep 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `anygrep status`
+      description: Add `--problems` if files were skipped or failed. Remove private paths if you need to.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Error message or traceback
+      render: text

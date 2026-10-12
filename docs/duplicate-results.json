@@ -1,0 +1,665 @@
+{
+ "rule": {
+  "text": 0.95,
+  "pdf": 0.95,
+  "image": 0.98
+ },
+ "max_changed": 0.18,
+ "copies": [
+  {
+   "a": "base/notes/sourdough.md",
+   "b": "copies/archive/sourdough.md",
+   "type": "text",
+   "same_sha": true,
+   "mean_cos": 1.0,
+   "max_chunk_cos": 0.9999,
+   "changed": 0.0,
+   "how": "exact copy, same name"
+  },
+  {
+   "a": "base/notes/sourdough.md",
+   "b": "copies/sourdough (copy).md",
+   "type": "text",
+   "same_sha": true,
+   "mean_cos": 0.9892,
+   "max_chunk_cos": 0.9892,
+   "changed": 0.0,
+   "how": "exact copy, other name"
+  },
+  {
+   "a": "base/notes/kyoto-trip.md",
+   "b": "copies/export/kyoto-trip.txt",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.99,
+   "max_chunk_cos": 0.9899,
+   "changed": 0.0,
+   "how": "plain-text export"
+  },
+  {
+   "a": "base/notes/meetings/2026-03-budget.md",
+   "b": "copies/drafts/2026-03-budget-v2.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.9914,
+   "max_chunk_cos": 0.9914,
+   "changed": 0.0233,
+   "how": "edited: a line changed, a line added"
+  },
+  {
+   "a": "base/notes/finance/tax-checklist.md",
+   "b": "copies/old/tax-checklist-2025.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.9595,
+   "max_chunk_cos": 0.9594,
+   "changed": 0.0,
+   "how": "older version: a line removed"
+  },
+  {
+   "a": "base/notes/finance/kakutei-shinkoku.md",
+   "b": "copies/jp/kakutei-shinkoku-memo.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.9908,
+   "max_chunk_cos": 0.9909,
+   "changed": 0.0,
+   "how": "Japanese, a sentence added"
+  },
+  {
+   "a": "heldout-recipes/recipes/pancakes.md",
+   "b": "copies/recipes/pancakes-double.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.972,
+   "max_chunk_cos": 0.972,
+   "changed": 0.1026,
+   "how": "edited: quantities changed"
+  },
+  {
+   "a": "base/docs/home-network-manual.pdf",
+   "b": "copies/docs/home-network-manual.pdf",
+   "type": "pdf",
+   "same_sha": true,
+   "mean_cos": 1.0,
+   "max_chunk_cos": 1.0001,
+   "changed": 0.0,
+   "how": "exact PDF copy"
+  },
+  {
+   "a": "base/docs/home-network-manual.pdf",
+   "b": "copies/docs/home-network-manual-rev2.pdf",
+   "type": "pdf",
+   "same_sha": false,
+   "mean_cos": 0.9921,
+   "max_chunk_cos": 0.9945,
+   "changed": 0.0071,
+   "how": "PDF regenerated, line added"
+  },
+  {
+   "a": "base/screenshots/error-dialog.png",
+   "b": "copies/shots/error-dialog-small.png",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9979,
+   "max_chunk_cos": 0.9979,
+   "changed": null,
+   "how": "resized 50%"
+  },
+  {
+   "a": "base/screenshots/terminal.png",
+   "b": "copies/shots/terminal.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9947,
+   "max_chunk_cos": 0.9947,
+   "changed": null,
+   "how": "PNG -> JPEG q70"
+  },
+  {
+   "a": "base/photos/sunset-beach.jpg",
+   "b": "copies/photos/sunset-cropped.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9931,
+   "max_chunk_cos": 0.9931,
+   "changed": null,
+   "how": "cropped 4% each side"
+  },
+  {
+   "a": "base/photos/whiteboard.jpg",
+   "b": "copies/photos/whiteboard-edit.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9964,
+   "max_chunk_cos": 0.9963,
+   "changed": null,
+   "how": "resized 75%, brighter"
+  },
+  {
+   "a": "base/screenshots/electricity-usage.png",
+   "b": "copies/shots/chart.png",
+   "type": "image",
+   "same_sha": true,
+   "mean_cos": 1.0,
+   "max_chunk_cos": 1.0,
+   "changed": null,
+   "how": "exact copy"
+  },
+  {
+   "a": "heldout-mixed/images/weather-app.png",
+   "b": "copies/shots/weather-thumb.png",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9818,
+   "max_chunk_cos": 0.9818,
+   "changed": null,
+   "how": "resized 33%"
+  },
+  {
+   "a": "base/diagrams/login-flow.png",
+   "b": "copies/shots/login-flow-thumb.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9749,
+   "max_chunk_cos": 0.9748,
+   "changed": null,
+   "how": "resized 25%, JPEG q50"
+  },
+  {
+   "a": "base/photos/red-bicycle.jpg",
+   "b": "copies/photos/red-bicycle-crop.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.995,
+   "max_chunk_cos": 0.9949,
+   "changed": null,
+   "how": "cropped 8% each side"
+  },
+  {
+   "a": "heldout-mixed/images/receipt.jpg",
+   "b": "copies/photos/receipt-q40.jpg",
+   "type": "image",
+   "same_sha": false,
+   "mean_cos": 0.9903,
+   "max_chunk_cos": 0.9904,
+   "changed": null,
+   "how": "JPEG q40"
+  },
+  {
+   "a": "base/notes/journal-2026.md",
+   "b": "copies/journal-2026-edited.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.9737,
+   "max_chunk_cos": 0.9747,
+   "changed": 0.0079,
+   "how": "long note, one section edited"
+  },
+  {
+   "a": "base/notes/reading/habits.md",
+   "b": "copies/reading/habits-extended.md",
+   "type": "text",
+   "same_sha": false,
+   "mean_cos": 0.9268,
+   "max_chunk_cos": 0.9267,
+   "changed": 0.0,
+   "how": "a paragraph appended"
+  }
+ ],
+ "other_pairs_by_type": {
+  "text": {
+   "pairs": 2336,
+   "lowest_copy": 0.9267,
+   "highest_other": 0.9856,
+   "top": [
+    {
+     "a": "related/forms/payslip-2026-01.txt",
+     "b": "related/forms/payslip-2026-02.txt",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9856,
+     "max_chunk_cos": 0.9856,
+     "changed": 0.32
+    },
+    {
+     "a": "related/forms/payslip-2026-02.txt",
+     "b": "related/forms/payslip-2026-03.txt",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9749,
+     "max_chunk_cos": 0.9749,
+     "changed": 0.32
+    },
+    {
+     "a": "related/forms/payslip-2026-01.txt",
+     "b": "related/forms/payslip-2026-03.txt",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9698,
+     "max_chunk_cos": 0.9698,
+     "changed": 0.32
+    },
+    {
+     "a": "copies/sourdough (copy).md",
+     "b": "related/notes/sourdough-rye.md",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9231,
+     "max_chunk_cos": 0.9232,
+     "changed": 0.1111
+    },
+    {
+     "a": "base/notes/sourdough.md",
+     "b": "related/notes/sourdough-rye.md",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9158,
+     "max_chunk_cos": 0.9158,
+     "changed": 0.1111
+    },
+    {
+     "a": "copies/archive/sourdough.md",
+     "b": "related/notes/sourdough-rye.md",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.9158,
+     "max_chunk_cos": 0.9158,
+     "changed": 0.1111
+    },
+    {
+     "a": "related/notes/status-2026-05-04.md",
+     "b": "related/notes/status-2026-05-11.md",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.8832,
+     "max_chunk_cos": 0.8832,
+     "changed": 0.8235
+    },
+    {
+     "a": "heldout-sourdough/notes/starter.md",
+     "b": "related/notes/sourdough-rye.md",
+     "type": "text",
+     "same_sha": false,
+     "mean_cos": 0.8555,
+     "max_chunk_cos": 0.8556,
+     "changed": 0.8214
+    }
+   ]
+  },
+  "pdf": {
+   "pairs": 33,
+   "lowest_copy": 0.9921,
+   "highest_other": 0.7022,
+   "top": [
+    {
+     "a": "base/docs/car-manual.pdf",
+     "b": "base/docs/solar-panel-report.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.724,
+     "max_chunk_cos": 0.7022,
+     "changed": 0.9552
+    },
+    {
+     "a": "base/docs/employee-handbook.pdf",
+     "b": "heldout-mixed/pdf/lease-agreement.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.7335,
+     "max_chunk_cos": 0.6846,
+     "changed": 0.9459
+    },
+    {
+     "a": "base/docs/home-network-manual.pdf",
+     "b": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.6946,
+     "max_chunk_cos": 0.6768,
+     "changed": 1.0
+    },
+    {
+     "a": "copies/docs/home-network-manual.pdf",
+     "b": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.6946,
+     "max_chunk_cos": 0.6768,
+     "changed": 1.0
+    },
+    {
+     "a": "base/docs/car-manual.pdf",
+     "b": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.7035,
+     "max_chunk_cos": 0.6755,
+     "changed": 1.0
+    },
+    {
+     "a": "copies/docs/home-network-manual-rev2.pdf",
+     "b": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.7014,
+     "max_chunk_cos": 0.6727,
+     "changed": 1.0
+    },
+    {
+     "a": "base/docs/solar-panel-report.pdf",
+     "b": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.7077,
+     "max_chunk_cos": 0.6639,
+     "changed": 1.0
+    },
+    {
+     "a": "heldout-mixed/pdf/cycling-strategy.pdf",
+     "b": "heldout-mixed/pdf/lease-agreement.pdf",
+     "type": "pdf",
+     "same_sha": false,
+     "mean_cos": 0.7326,
+     "max_chunk_cos": 0.6638,
+     "changed": 1.0
+    }
+   ]
+  },
+  "image": {
+   "pairs": 981,
+   "lowest_copy": 0.9748,
+   "highest_other": 0.999,
+   "top": [
+    {
+     "a": "base/screenshots/electricity-usage.png",
+     "b": "related/images/electricity-usage-2025.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.999,
+     "max_chunk_cos": 0.999,
+     "changed": null
+    },
+    {
+     "a": "copies/shots/chart.png",
+     "b": "related/images/electricity-usage-2025.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.999,
+     "max_chunk_cos": 0.999,
+     "changed": null
+    },
+    {
+     "a": "heldout-mixed/images/chess.png",
+     "b": "related/images/chess-green.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.9704,
+     "max_chunk_cos": 0.9704,
+     "changed": null
+    },
+    {
+     "a": "copies/shots/weather-thumb.png",
+     "b": "related/images/weather-paris.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.9407,
+     "max_chunk_cos": 0.9406,
+     "changed": null
+    },
+    {
+     "a": "heldout-mixed/images/weather-app.png",
+     "b": "related/images/weather-paris.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.9401,
+     "max_chunk_cos": 0.9402,
+     "changed": null
+    },
+    {
+     "a": "heldout-mixed/images/org-chart.png",
+     "b": "related/images/org-chart-2.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.9264,
+     "max_chunk_cos": 0.9263,
+     "changed": null
+    },
+    {
+     "a": "related/images/electricity-usage-2025.png",
+     "b": "related/images/water-usage.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.8876,
+     "max_chunk_cos": 0.8875,
+     "changed": null
+    },
+    {
+     "a": "base/screenshots/electricity-usage.png",
+     "b": "related/images/water-usage.png",
+     "type": "image",
+     "same_sha": false,
+     "mean_cos": 0.8869,
+     "max_chunk_cos": 0.8868,
+     "changed": null
+    }
+   ]
+  }
+ },
+ "copies_not_merged": [
+  "copies/shots/login-flow-thumb.jpg",
+  "copies/reading/habits-extended.md"
+ ],
+ "other_pairs_merged": [
+  [
+   "base/screenshots/electricity-usage.png",
+   "related/images/electricity-usage-2025.png"
+  ],
+  [
+   "copies/shots/chart.png",
+   "related/images/electricity-usage-2025.png"
+  ]
+ ],
+ "search_ms": {
+  "plain": 0.72,
+  "collapse": 2.19
+ },
+ "groups": [
+  {
+   "members": [
+    "base/notes/sourdough.md",
+    "copies/archive/sourdough.md",
+    "copies/sourdough (copy).md"
+   ],
+   "queries": 1
+  },
+  {
+   "members": [
+    "copies/sourdough (copy).md",
+    "base/notes/sourdough.md",
+    "copies/archive/sourdough.md"
+   ],
+   "queries": 4
+  },
+  {
+   "members": [
+    "copies/export/kyoto-trip.txt",
+    "base/notes/kyoto-trip.md"
+   ],
+   "queries": 3
+  },
+  {
+   "members": [
+    "copies/journal-2026-edited.md",
+    "base/notes/journal-2026.md"
+   ],
+   "queries": 23
+  },
+  {
+   "members": [
+    "copies/jp/kakutei-shinkoku-memo.md",
+    "base/notes/finance/kakutei-shinkoku.md"
+   ],
+   "queries": 6
+  },
+  {
+   "members": [
+    "base/notes/meetings/2026-03-budget.md",
+    "copies/drafts/2026-03-budget-v2.md"
+   ],
+   "queries": 4
+  },
+  {
+   "members": [
+    "copies/photos/whiteboard-edit.jpg",
+    "base/photos/whiteboard.jpg"
+   ],
+   "queries": 16
+  },
+  {
+   "members": [
+    "copies/photos/receipt-q40.jpg",
+    "heldout-mixed/images/receipt.jpg"
+   ],
+   "queries": 3
+  },
+  {
+   "members": [
+    "copies/drafts/2026-03-budget-v2.md",
+    "base/notes/meetings/2026-03-budget.md"
+   ],
+   "queries": 7
+  },
+  {
+   "members": [
+    "copies/shots/error-dialog-small.png",
+    "base/screenshots/error-dialog.png"
+   ],
+   "queries": 9
+  },
+  {
+   "members": [
+    "base/screenshots/error-dialog.png",
+    "copies/shots/error-dialog-small.png"
+   ],
+   "queries": 6
+  },
+  {
+   "members": [
+    "base/notes/journal-2026.md",
+    "copies/journal-2026-edited.md"
+   ],
+   "queries": 1
+  },
+  {
+   "members": [
+    "copies/docs/home-network-manual-rev2.pdf",
+    "base/docs/home-network-manual.pdf",
+    "copies/docs/home-network-manual.pdf"
+   ],
+   "queries": 8
+  },
+  {
+   "members": [
+    "base/screenshots/terminal.png",
+    "copies/shots/terminal.jpg"
+   ],
+   "queries": 5
+  },
+  {
+   "members": [
+    "copies/photos/red-bicycle-crop.jpg",
+    "base/photos/red-bicycle.jpg"
+   ],
+   "queries": 2
+  },
+  {
+   "members": [
+    "base/notes/finance/tax-checklist.md",
+    "copies/old/tax-checklist-2025.md"
+   ],
+   "queries": 4
+  },
+  {
+   "members": [
+    "base/notes/finance/kakutei-shinkoku.md",
+    "copies/jp/kakutei-shinkoku-memo.md"
+   ],
+   "queries": 1
+  },
+  {
+   "members": [
+    "base/photos/red-bicycle.jpg",
+    "copies/photos/red-bicycle-crop.jpg"
+   ],
+   "queries": 11
+  },
+  {
+   "members": [
+    "heldout-mixed/images/weather-app.png",
+    "copies/shots/weather-thumb.png"
+   ],
+   "queries": 2
+  },
+  {
+   "members": [
+    "copies/shots/terminal.jpg",
+    "base/screenshots/terminal.png"
+   ],
+   "queries": 2
+  },
+  {
+   "members": [
+    "heldout-mixed/images/receipt.jpg",
+    "copies/photos/receipt-q40.jpg"
+   ],
+   "queries": 4
+  },
+  {
+   "members": [
+    "related/images/electricity-usage-2025.png",
+    "base/screenshots/electricity-usage.png",
+    "copies/shots/chart.png"
+   ],
+   "queries": 4
+  },
+  {
+   "members": [
+    "base/screenshots/electricity-usage.png",
+    "copies/shots/chart.png",
+    "related/images/electricity-usage-2025.png"
+   ],
+   "queries": 5
+  },
+  {
+   "members": [
+    "base/photos/sunset-beach.jpg",
+    "copies/photos/sunset-cropped.jpg"
+   ],
+   "queries": 6
+  },
+  {
+   "members": [
+    "copies/shots/weather-thumb.png",
+    "heldout-mixed/images/weather-app.png"
+   ],
+   "queries": 7
+  },
+  {
+   "members": [
+    "base/docs/home-network-manual.pdf",
+    "copies/docs/home-network-manual.pdf",
+    "copies/docs/home-network-manual-rev2.pdf"
+   ],
+   "queries": 2
+  },
+  {
+   "members": [
+    "copies/photos/sunset-cropped.jpg",
+    "base/photos/sunset-beach.jpg"
+   ],
+   "queries": 5
+  }
+ ],
+ "wrong_merges": 13
+}

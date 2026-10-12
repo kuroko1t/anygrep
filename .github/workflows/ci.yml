@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: pip install ".[dev]"
+      - name: Unit tests (the real-model test is skipped without model files)
+        run: pytest -q
+      - name: CLI smoke test
+        run: |
+          anygrep --version
+          anygrep status
+          anygrep model
+
+  model:
+    # Downloads the int8 model (~540 MB) once per week of cache, then runs the
+    # real-model test and a demo-corpus round trip on each OS.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      ANYGREP_MODEL_DIR: ${{ github.workspace }}/.model
+      ANYGREP_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: .model
+          key: model-daa72c512439
+      - run: pip install ".[dev]"
+      - run: anygrep model --download
+      - run: pytest -q -m model
+      - name: Demo corpus round trip
+        # Outside the checkout: the repository's .gitignore excludes demo/corpus.
+        shell: bash
+        run: |
+          set -euo pipefail
+          corpus="$RUNNER_TEMP/demo-corpus"
+          idx="$RUNNER_TEMP/demo-index.sqlite"
+          python scripts/make_demo_corpus.py "$corpus"
+          anygrep index "$corpus" --db "$idx"
+          anygrep status --db "$idx"
+          anygrep "reset the wifi password" "$corpus" --db "$idx" --no-index --json -m 3 > "$RUNNER_TEMP/out.jsonl"
+          python - "$RUNNER_TEMP/out.jsonl" <<'PY'
+          import json, sys
+          hits = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
+          assert 1 <= len(hits) <= 3, hits
+          top = hits[0]
+          assert top["path"].replace("\\", "/").endswith("docs/home-network-manual.pdf"), top
+          assert top["weak"] is False, top
+          print("top hit:", top["path"], top["score"])
+          PY
+          # Large folders: a dry run, then a background job that is waited for.
+          bg="$RUNNER_TEMP/bg notes"
+          mkdir -p "$bg"
+          echo "The garden plants need watering every morning" > "$bg/garden.txt"
+          anygrep index --dry-run "$bg" --db "$idx" 2>&1 | grep "1 new or changed"
+          anygrep index --background "$bg" --db "$idx"
+          for _ in $(seq 1 150); do
+            anygrep status --db "$idx" --json | python -c "import json, sys; sys.exit(json.load(sys.stdin)['job'] is not None)" && break
+            sleep 2
+          done
+          anygrep "watering the garden" "$bg" --db "$idx" --no-index -l | grep garden.txt
+          anygrep index --stop --db "$idx"
+          # Exit status: 1 when nothing passes the cutoff, 2 for a missing PATH.
+          set +e
+          anygrep "qwzx plorb fnord" "$corpus" --db "$idx" --no-index -q; test $? -eq 1 || exit 1
+          anygrep "wifi" "$corpus/no-such-folder" --db "$idx" --no-index -q; test $? -eq 2 || exit 1

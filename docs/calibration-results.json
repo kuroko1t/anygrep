@@ -1,0 +1,2057 @@
+{
+ "rule": {
+  "min_scores": {
+   "text->text": {
+    "0": 0.62
+   },
+   "text->pdf": {
+    "0": 0.64
+   },
+   "text->image": {
+    "70": 0.63,
+    "140": 0.62,
+    "280": 0.62
+   },
+   "image->image": {
+    "70": 0.76,
+    "140": 0.75,
+    "280": 0.7
+   },
+   "image->text": {
+    "70": 0.62,
+    "140": 0.62,
+    "280": 0.55
+   },
+   "image->pdf": {
+    "70": 0.62,
+    "140": 0.62,
+    "280": 0.61
+   }
+  },
+  "min_margins": {
+   "text->text": 0.1,
+   "text->pdf": 0.11,
+   "text->image": 0.06,
+   "image->image": 0.09,
+   "image->text": 0.04,
+   "image->pdf": 0.13
+  }
+ },
+ "queries": {
+  "text": 47,
+  "text_unrelated": 36,
+  "image": 9,
+  "image_unrelated": 4
+ },
+ "budgets": {
+  "140": {
+   "pairs": {
+    "image->image": {
+     "threshold": 0.75,
+     "suggested": 0.75,
+     "margin": 0.09,
+     "suggested_margin": 0.09,
+     "relevant": {
+      "n": 9,
+      "min": 0.76,
+      "p05": 0.791,
+      "median": 0.886,
+      "p95": 0.994,
+      "max": 0.996
+     },
+     "relevant_excess": {
+      "n": 9,
+      "min": 0.099,
+      "p05": 0.115,
+      "median": 0.197,
+      "p95": 0.267,
+      "max": 0.272
+     },
+     "irrelevant_same_query": {
+      "n": 135,
+      "min": 0.597,
+      "p05": 0.618,
+      "median": 0.684,
+      "p95": 0.76,
+      "max": 0.795
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.57,
+      "p05": 0.595,
+      "median": 0.674,
+      "p95": 0.731,
+      "max": 0.744
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.146,
+      "p05": -0.121,
+      "median": -0.059,
+      "p95": 0.006,
+      "max": 0.034
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.043,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.409,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.409,
+      "unrelated_shown": 0
+     }
+    },
+    "image->pdf": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.13,
+     "suggested_margin": 0.13,
+     "relevant": {
+      "n": 1,
+      "min": 0.714,
+      "p05": 0.714,
+      "median": 0.714,
+      "p95": 0.714,
+      "max": 0.714
+     },
+     "relevant_excess": {
+      "n": 1,
+      "min": 0.14,
+      "p05": 0.14,
+      "median": 0.14,
+      "p95": 0.14,
+      "max": 0.14
+     },
+     "irrelevant_same_query": {
+      "n": 35,
+      "min": 0.548,
+      "p05": 0.551,
+      "median": 0.58,
+      "p95": 0.647,
+      "max": 0.665
+     },
+     "unrelated_queries": {
+      "n": 16,
+      "min": 0.523,
+      "p05": 0.533,
+      "median": 0.569,
+      "p95": 0.601,
+      "max": 0.611
+     },
+     "unrelated_excess": {
+      "n": 16,
+      "min": -0.019,
+      "p05": -0.013,
+      "median": 0.006,
+      "p95": 0.038,
+      "max": 0.045
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.019,
+      "unrelated_shown": 16
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.125,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.2,
+      "unrelated_shown": 0
+     }
+    },
+    "image->text": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.04,
+     "suggested_margin": 0.04,
+     "relevant": {
+      "n": 2,
+      "min": 0.622,
+      "p05": 0.624,
+      "median": 0.651,
+      "p95": 0.678,
+      "max": 0.681
+     },
+     "relevant_excess": {
+      "n": 2,
+      "min": 0.048,
+      "p05": 0.051,
+      "median": 0.082,
+      "p95": 0.113,
+      "max": 0.117
+     },
+     "irrelevant_same_query": {
+      "n": 142,
+      "min": 0.504,
+      "p05": 0.52,
+      "median": 0.57,
+      "p95": 0.627,
+      "max": 0.7
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.456,
+      "p05": 0.499,
+      "median": 0.547,
+      "p95": 0.597,
+      "max": 0.61
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.085,
+      "p05": -0.063,
+      "median": -0.01,
+      "p95": 0.029,
+      "max": 0.037
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.01,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.143,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.154,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.2,
+      "unrelated_shown": 0
+     }
+    },
+    "text->image": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.06,
+     "suggested_margin": 0.06,
+     "relevant": {
+      "n": 23,
+      "min": 0.607,
+      "p05": 0.628,
+      "median": 0.741,
+      "p95": 0.797,
+      "max": 0.83
+     },
+     "relevant_excess": {
+      "n": 23,
+      "min": 0.065,
+      "p05": 0.067,
+      "median": 0.191,
+      "p95": 0.234,
+      "max": 0.266
+     },
+     "irrelevant_same_query": {
+      "n": 729,
+      "min": 0.425,
+      "p05": 0.497,
+      "median": 0.545,
+      "p95": 0.608,
+      "max": 0.693
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.457,
+      "p05": 0.486,
+      "median": 0.581,
+      "p95": 0.645,
+      "max": 0.681
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.075,
+      "p05": -0.051,
+      "median": -0.016,
+      "p95": 0.018,
+      "max": 0.082
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.017,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 0.957,
+      "precision": 0.125,
+      "unrelated_shown": 129
+     },
+     "full_rule": {
+      "recall": 0.957,
+      "precision": 0.5,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 0.957,
+      "precision": 0.44,
+      "unrelated_shown": 4
+     }
+    },
+    "text->pdf": {
+     "threshold": 0.64,
+     "suggested": 0.64,
+     "margin": 0.11,
+     "suggested_margin": 0.11,
+     "relevant": {
+      "n": 10,
+      "min": 0.648,
+      "p05": 0.665,
+      "median": 0.742,
+      "p95": 0.831,
+      "max": 0.864
+     },
+     "relevant_excess": {
+      "n": 10,
+      "min": 0.118,
+      "p05": 0.134,
+      "median": 0.224,
+      "p95": 0.3,
+      "max": 0.325
+     },
+     "irrelevant_same_query": {
+      "n": 178,
+      "min": 0.454,
+      "p05": 0.476,
+      "median": 0.523,
+      "p95": 0.583,
+      "max": 0.683
+     },
+     "unrelated_queries": {
+      "n": 144,
+      "min": 0.439,
+      "p05": 0.456,
+      "median": 0.546,
+      "p95": 0.607,
+      "max": 0.632
+     },
+     "unrelated_excess": {
+      "n": 144,
+      "min": -0.068,
+      "p05": -0.049,
+      "median": -0.022,
+      "p95": 0.023,
+      "max": 0.06
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.03,
+      "unrelated_shown": 144
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     }
+    },
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.1,
+     "suggested_margin": 0.1,
+     "relevant": {
+      "n": 28,
+      "min": 0.626,
+      "p05": 0.631,
+      "median": 0.724,
+      "p95": 0.8,
+      "max": 0.818
+     },
+     "relevant_excess": {
+      "n": 28,
+      "min": 0.075,
+      "p05": 0.105,
+      "median": 0.204,
+      "p95": 0.273,
+      "max": 0.295
+     },
+     "irrelevant_same_query": {
+      "n": 724,
+      "min": 0.415,
+      "p05": 0.456,
+      "median": 0.516,
+      "p95": 0.587,
+      "max": 0.648
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.413,
+      "p05": 0.451,
+      "median": 0.546,
+      "p95": 0.616,
+      "max": 0.654
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.087,
+      "p05": -0.064,
+      "median": -0.02,
+      "p95": 0.027,
+      "max": 0.065
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.021,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.459,
+      "unrelated_shown": 25
+     },
+     "full_rule": {
+      "recall": 0.964,
+      "precision": 0.871,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.596,
+      "unrelated_shown": 11
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "71/73",
+     "unrelated_queries_with_results": "0/40",
+     "unrelated_with_results": [],
+     "relevant_hidden": [
+      "running out of disk space -> notes/dev/docker-cheatsheet.md (0.634)",
+      "when is the piano lesson -> screenshots/calendar.png (0.607)"
+     ],
+     "unlabelled_shown_per_query": 0.68,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "72/73",
+     "unrelated_queries_with_results": "11/40",
+     "unrelated_with_results": [
+      "!!!",
+      "a",
+      "asdf qwer zxcv",
+      "lorem ipsum dolor sit amet",
+      "test test",
+      "the",
+      "untitled",
+      "zzzzzzzz",
+      "あ",
+      "えーと",
+      "なし"
+     ],
+     "relevant_hidden": [
+      "when is the piano lesson -> screenshots/calendar.png (0.607)"
+     ],
+     "unlabelled_shown_per_query": 1.04
+    }
+   }
+  },
+  "70": {
+   "pairs": {
+    "image->image": {
+     "threshold": 0.76,
+     "suggested": 0.76,
+     "margin": 0.09,
+     "suggested_margin": 0.07,
+     "relevant": {
+      "n": 9,
+      "min": 0.764,
+      "p05": 0.79,
+      "median": 0.876,
+      "p95": 0.99,
+      "max": 0.996
+     },
+     "relevant_excess": {
+      "n": 9,
+      "min": 0.079,
+      "p05": 0.091,
+      "median": 0.166,
+      "p95": 0.251,
+      "max": 0.251
+     },
+     "irrelevant_same_query": {
+      "n": 135,
+      "min": 0.61,
+      "p05": 0.628,
+      "median": 0.692,
+      "p95": 0.759,
+      "max": 0.79
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.599,
+      "p05": 0.619,
+      "median": 0.685,
+      "p95": 0.736,
+      "max": 0.751
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.129,
+      "p05": -0.11,
+      "median": -0.061,
+      "p95": 0.014,
+      "max": 0.021
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.043,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.692,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 0.889,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.692,
+      "unrelated_shown": 0
+     }
+    },
+    "image->pdf": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.13,
+     "suggested_margin": 0.13,
+     "relevant": {
+      "n": 1,
+      "min": 0.713,
+      "p05": 0.713,
+      "median": 0.713,
+      "p95": 0.713,
+      "max": 0.713
+     },
+     "relevant_excess": {
+      "n": 1,
+      "min": 0.139,
+      "p05": 0.139,
+      "median": 0.139,
+      "p95": 0.139,
+      "max": 0.139
+     },
+     "irrelevant_same_query": {
+      "n": 35,
+      "min": 0.543,
+      "p05": 0.553,
+      "median": 0.587,
+      "p95": 0.66,
+      "max": 0.676
+     },
+     "unrelated_queries": {
+      "n": 16,
+      "min": 0.544,
+      "p05": 0.548,
+      "median": 0.579,
+      "p95": 0.612,
+      "max": 0.616
+     },
+     "unrelated_excess": {
+      "n": 16,
+      "min": -0.02,
+      "p05": -0.013,
+      "median": 0.005,
+      "p95": 0.032,
+      "max": 0.036
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.019,
+      "unrelated_shown": 16
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.125,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.2,
+      "unrelated_shown": 0
+     }
+    },
+    "image->text": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.04,
+     "suggested_margin": 0.04,
+     "relevant": {
+      "n": 2,
+      "min": 0.624,
+      "p05": 0.626,
+      "median": 0.646,
+      "p95": 0.666,
+      "max": 0.668
+     },
+     "relevant_excess": {
+      "n": 2,
+      "min": 0.046,
+      "p05": 0.049,
+      "median": 0.073,
+      "p95": 0.097,
+      "max": 0.1
+     },
+     "irrelevant_same_query": {
+      "n": 142,
+      "min": 0.506,
+      "p05": 0.528,
+      "median": 0.575,
+      "p95": 0.637,
+      "max": 0.71
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.465,
+      "p05": 0.512,
+      "median": 0.557,
+      "p95": 0.6,
+      "max": 0.615
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.087,
+      "p05": -0.062,
+      "median": -0.012,
+      "p95": 0.02,
+      "max": 0.034
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.01,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.118,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.125,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.154,
+      "unrelated_shown": 0
+     }
+    },
+    "text->image": {
+     "threshold": 0.63,
+     "suggested": 0.63,
+     "margin": 0.06,
+     "suggested_margin": 0.06,
+     "relevant": {
+      "n": 23,
+      "min": 0.618,
+      "p05": 0.633,
+      "median": 0.759,
+      "p95": 0.818,
+      "max": 0.826
+     },
+     "relevant_excess": {
+      "n": 23,
+      "min": 0.067,
+      "p05": 0.074,
+      "median": 0.198,
+      "p95": 0.249,
+      "max": 0.26
+     },
+     "irrelevant_same_query": {
+      "n": 729,
+      "min": 0.432,
+      "p05": 0.504,
+      "median": 0.552,
+      "p95": 0.618,
+      "max": 0.707
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.47,
+      "p05": 0.493,
+      "median": 0.587,
+      "p95": 0.654,
+      "max": 0.687
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.075,
+      "p05": -0.048,
+      "median": -0.015,
+      "p95": 0.02,
+      "max": 0.072
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.017,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 0.957,
+      "precision": 0.127,
+      "unrelated_shown": 125
+     },
+     "full_rule": {
+      "recall": 0.957,
+      "precision": 0.478,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 0.957,
+      "precision": 0.4,
+      "unrelated_shown": 7
+     }
+    },
+    "text->pdf": {
+     "threshold": 0.64,
+     "suggested": 0.64,
+     "margin": 0.11,
+     "suggested_margin": 0.11,
+     "relevant": {
+      "n": 10,
+      "min": 0.648,
+      "p05": 0.665,
+      "median": 0.742,
+      "p95": 0.831,
+      "max": 0.864
+     },
+     "relevant_excess": {
+      "n": 10,
+      "min": 0.118,
+      "p05": 0.134,
+      "median": 0.224,
+      "p95": 0.3,
+      "max": 0.325
+     },
+     "irrelevant_same_query": {
+      "n": 178,
+      "min": 0.454,
+      "p05": 0.476,
+      "median": 0.523,
+      "p95": 0.583,
+      "max": 0.683
+     },
+     "unrelated_queries": {
+      "n": 144,
+      "min": 0.439,
+      "p05": 0.456,
+      "median": 0.546,
+      "p95": 0.607,
+      "max": 0.632
+     },
+     "unrelated_excess": {
+      "n": 144,
+      "min": -0.068,
+      "p05": -0.049,
+      "median": -0.022,
+      "p95": 0.023,
+      "max": 0.06
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.03,
+      "unrelated_shown": 144
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     }
+    },
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.1,
+     "suggested_margin": 0.1,
+     "relevant": {
+      "n": 28,
+      "min": 0.626,
+      "p05": 0.631,
+      "median": 0.724,
+      "p95": 0.8,
+      "max": 0.818
+     },
+     "relevant_excess": {
+      "n": 28,
+      "min": 0.075,
+      "p05": 0.105,
+      "median": 0.204,
+      "p95": 0.273,
+      "max": 0.295
+     },
+     "irrelevant_same_query": {
+      "n": 724,
+      "min": 0.415,
+      "p05": 0.456,
+      "median": 0.516,
+      "p95": 0.587,
+      "max": 0.648
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.413,
+      "p05": 0.451,
+      "median": 0.546,
+      "p95": 0.616,
+      "max": 0.654
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.087,
+      "p05": -0.064,
+      "median": -0.02,
+      "p95": 0.027,
+      "max": 0.065
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.021,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.459,
+      "unrelated_shown": 25
+     },
+     "full_rule": {
+      "recall": 0.964,
+      "precision": 0.871,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.596,
+      "unrelated_shown": 11
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "70/73",
+     "unrelated_queries_with_results": "0/40",
+     "unrelated_with_results": [],
+     "relevant_hidden": [
+      "running out of disk space -> notes/dev/docker-cheatsheet.md (0.634)",
+      "when is the piano lesson -> screenshots/calendar.png (0.618)",
+      "sprint-whiteboard -> photos/whiteboard.jpg (0.764)"
+     ],
+     "unlabelled_shown_per_query": 0.77,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "72/73",
+     "unrelated_queries_with_results": "11/40",
+     "unrelated_with_results": [
+      "!!!",
+      "a",
+      "asdf qwer zxcv",
+      "lorem ipsum dolor sit amet",
+      "test test",
+      "the",
+      "untitled",
+      "zzzzzzzz",
+      "あ",
+      "えーと",
+      "なし"
+     ],
+     "relevant_hidden": [
+      "when is the piano lesson -> screenshots/calendar.png (0.618)"
+     ],
+     "unlabelled_shown_per_query": 0.96
+    }
+   }
+  },
+  "280": {
+   "pairs": {
+    "image->image": {
+     "threshold": 0.7,
+     "suggested": 0.7,
+     "margin": 0.09,
+     "suggested_margin": 0.11,
+     "relevant": {
+      "n": 9,
+      "min": 0.703,
+      "p05": 0.713,
+      "median": 0.821,
+      "p95": 0.981,
+      "max": 0.99
+     },
+     "relevant_excess": {
+      "n": 9,
+      "min": 0.119,
+      "p05": 0.132,
+      "median": 0.217,
+      "p95": 0.277,
+      "max": 0.28
+     },
+     "irrelevant_same_query": {
+      "n": 135,
+      "min": 0.484,
+      "p05": 0.537,
+      "median": 0.603,
+      "p95": 0.738,
+      "max": 0.825
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.526,
+      "p05": 0.539,
+      "median": 0.612,
+      "p95": 0.759,
+      "max": 0.785
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.14,
+      "p05": -0.132,
+      "median": -0.063,
+      "p95": 0.065,
+      "max": 0.081
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.043,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.31,
+      "unrelated_shown": 8
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.9,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.31,
+      "unrelated_shown": 8
+     }
+    },
+    "image->pdf": {
+     "threshold": 0.61,
+     "suggested": 0.61,
+     "margin": 0.13,
+     "suggested_margin": 0.15,
+     "relevant": {
+      "n": 1,
+      "min": 0.671,
+      "p05": 0.671,
+      "median": 0.671,
+      "p95": 0.671,
+      "max": 0.671
+     },
+     "relevant_excess": {
+      "n": 1,
+      "min": 0.153,
+      "p05": 0.153,
+      "median": 0.153,
+      "p95": 0.153,
+      "max": 0.153
+     },
+     "irrelevant_same_query": {
+      "n": 35,
+      "min": 0.503,
+      "p05": 0.516,
+      "median": 0.556,
+      "p95": 0.611,
+      "max": 0.634
+     },
+     "unrelated_queries": {
+      "n": 16,
+      "min": 0.524,
+      "p05": 0.531,
+      "median": 0.559,
+      "p95": 0.588,
+      "max": 0.609
+     },
+     "unrelated_excess": {
+      "n": 16,
+      "min": -0.014,
+      "p05": -0.012,
+      "median": 0.008,
+      "p95": 0.043,
+      "max": 0.046
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.019,
+      "unrelated_shown": 16
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.333,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.333,
+      "unrelated_shown": 0
+     }
+    },
+    "image->text": {
+     "threshold": 0.55,
+     "suggested": 0.55,
+     "margin": 0.04,
+     "suggested_margin": 0.03,
+     "relevant": {
+      "n": 2,
+      "min": 0.556,
+      "p05": 0.562,
+      "median": 0.612,
+      "p95": 0.662,
+      "max": 0.667
+     },
+     "relevant_excess": {
+      "n": 2,
+      "min": 0.037,
+      "p05": 0.041,
+      "median": 0.075,
+      "p95": 0.11,
+      "max": 0.113
+     },
+     "irrelevant_same_query": {
+      "n": 142,
+      "min": 0.442,
+      "p05": 0.485,
+      "median": 0.538,
+      "p95": 0.591,
+      "max": 0.666
+     },
+     "unrelated_queries": {
+      "n": 64,
+      "min": 0.459,
+      "p05": 0.497,
+      "median": 0.543,
+      "p95": 0.586,
+      "max": 0.6
+     },
+     "unrelated_excess": {
+      "n": 64,
+      "min": -0.085,
+      "p05": -0.061,
+      "median": -0.005,
+      "p95": 0.032,
+      "max": 0.04
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.01,
+      "unrelated_shown": 64
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.024,
+      "unrelated_shown": 27
+     },
+     "full_rule": {
+      "recall": 0.5,
+      "precision": 0.043,
+      "unrelated_shown": 1
+     },
+     "legacy_median_rule": {
+      "recall": 0.5,
+      "precision": 0.067,
+      "unrelated_shown": 1
+     }
+    },
+    "text->image": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.06,
+     "suggested_margin": 0.06,
+     "relevant": {
+      "n": 23,
+      "min": 0.567,
+      "p05": 0.629,
+      "median": 0.727,
+      "p95": 0.789,
+      "max": 0.801
+     },
+     "relevant_excess": {
+      "n": 23,
+      "min": 0.034,
+      "p05": 0.071,
+      "median": 0.18,
+      "p95": 0.241,
+      "max": 0.245
+     },
+     "irrelevant_same_query": {
+      "n": 729,
+      "min": 0.4,
+      "p05": 0.473,
+      "median": 0.534,
+      "p95": 0.598,
+      "max": 0.671
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.432,
+      "p05": 0.466,
+      "median": 0.555,
+      "p95": 0.649,
+      "max": 0.69
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.109,
+      "p05": -0.072,
+      "median": -0.021,
+      "p95": 0.038,
+      "max": 0.102
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.017,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 0.957,
+      "precision": 0.19,
+      "unrelated_shown": 80
+     },
+     "full_rule": {
+      "recall": 0.957,
+      "precision": 0.595,
+      "unrelated_shown": 1
+     },
+     "legacy_median_rule": {
+      "recall": 0.957,
+      "precision": 0.234,
+      "unrelated_shown": 58
+     }
+    },
+    "text->pdf": {
+     "threshold": 0.64,
+     "suggested": 0.64,
+     "margin": 0.11,
+     "suggested_margin": 0.11,
+     "relevant": {
+      "n": 10,
+      "min": 0.648,
+      "p05": 0.665,
+      "median": 0.742,
+      "p95": 0.831,
+      "max": 0.864
+     },
+     "relevant_excess": {
+      "n": 10,
+      "min": 0.118,
+      "p05": 0.134,
+      "median": 0.224,
+      "p95": 0.3,
+      "max": 0.325
+     },
+     "irrelevant_same_query": {
+      "n": 178,
+      "min": 0.454,
+      "p05": 0.476,
+      "median": 0.523,
+      "p95": 0.583,
+      "max": 0.683
+     },
+     "unrelated_queries": {
+      "n": 144,
+      "min": 0.439,
+      "p05": 0.456,
+      "median": 0.546,
+      "p95": 0.607,
+      "max": 0.632
+     },
+     "unrelated_excess": {
+      "n": 144,
+      "min": -0.068,
+      "p05": -0.049,
+      "median": -0.022,
+      "p95": 0.023,
+      "max": 0.06
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.03,
+      "unrelated_shown": 144
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.909,
+      "unrelated_shown": 0
+     }
+    },
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.62,
+     "margin": 0.1,
+     "suggested_margin": 0.1,
+     "relevant": {
+      "n": 28,
+      "min": 0.626,
+      "p05": 0.631,
+      "median": 0.724,
+      "p95": 0.8,
+      "max": 0.818
+     },
+     "relevant_excess": {
+      "n": 28,
+      "min": 0.075,
+      "p05": 0.105,
+      "median": 0.204,
+      "p95": 0.273,
+      "max": 0.295
+     },
+     "irrelevant_same_query": {
+      "n": 724,
+      "min": 0.415,
+      "p05": 0.456,
+      "median": 0.516,
+      "p95": 0.587,
+      "max": 0.648
+     },
+     "unrelated_queries": {
+      "n": 576,
+      "min": 0.413,
+      "p05": 0.451,
+      "median": 0.546,
+      "p95": 0.616,
+      "max": 0.654
+     },
+     "unrelated_excess": {
+      "n": 576,
+      "min": -0.087,
+      "p05": -0.064,
+      "median": -0.02,
+      "p95": 0.027,
+      "max": 0.065
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.021,
+      "unrelated_shown": 576
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.459,
+      "unrelated_shown": 25
+     },
+     "full_rule": {
+      "recall": 0.964,
+      "precision": 0.871,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.596,
+      "unrelated_shown": 11
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "70/73",
+     "unrelated_queries_with_results": "2/40",
+     "unrelated_with_results": [
+      "noise",
+      "volcano eruption in iceland"
+     ],
+     "relevant_hidden": [
+      "running out of disk space -> notes/dev/docker-cheatsheet.md (0.634)",
+      "when is the piano lesson -> screenshots/calendar.png (0.567)",
+      "storage-warning -> notes/dev/docker-cheatsheet.md (0.556)"
+     ],
+     "unlabelled_shown_per_query": 0.73,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "71/73",
+     "unrelated_queries_with_results": "22/40",
+     "unrelated_with_results": [
+      "!!!",
+      "1234",
+      "???",
+      "a",
+      "asdf qwer zxcv",
+      "checker",
+      "gray",
+      "hi",
+      "hmm",
+      "lorem ipsum dolor sit amet",
+      "noise",
+      "ok",
+      "qwerty",
+      "test test",
+      "the",
+      "untitled",
+      "volcano eruption in iceland",
+      "zzzzzzzz",
+      "あ",
+      "えーと",
+      "なし",
+      "ほげほげ ふがふが"
+     ],
+     "relevant_hidden": [
+      "when is the piano lesson -> screenshots/calendar.png (0.567)",
+      "storage-warning -> notes/dev/docker-cheatsheet.md (0.556)"
+     ],
+     "unlabelled_shown_per_query": 0.89
+    }
+   }
+  }
+ },
+ "heldout": {
+  "mixed": {
+   "pairs": {
+    "image->image": {
+     "threshold": 0.75,
+     "suggested": 0.74,
+     "margin": 0.09,
+     "suggested_margin": 0.06,
+     "relevant": {
+      "n": 7,
+      "min": 0.762,
+      "p05": 0.785,
+      "median": 0.905,
+      "p95": 0.966,
+      "max": 0.974
+     },
+     "relevant_excess": {
+      "n": 7,
+      "min": 0.064,
+      "p05": 0.092,
+      "median": 0.224,
+      "p95": 0.257,
+      "max": 0.268
+     },
+     "irrelevant_same_query": {
+      "n": 77,
+      "min": 0.562,
+      "p05": 0.615,
+      "median": 0.666,
+      "p95": 0.744,
+      "max": 0.824
+     },
+     "unrelated_queries": {
+      "n": 56,
+      "min": 0.565,
+      "p05": 0.6,
+      "median": 0.657,
+      "p95": 0.715,
+      "max": 0.736
+     },
+     "unrelated_excess": {
+      "n": 56,
+      "min": -0.135,
+      "p05": -0.118,
+      "median": -0.071,
+      "p95": -0.009,
+      "max": -0.003
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.05,
+      "unrelated_shown": 56
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.7,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 0.857,
+      "precision": 0.75,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.7,
+      "unrelated_shown": 0
+     }
+    },
+    "image->pdf": {
+     "threshold": 0.62,
+     "suggested": null,
+     "margin": 0.13,
+     "suggested_margin": null,
+     "relevant": {
+      "n": 0
+     },
+     "relevant_excess": {
+      "n": 0
+     },
+     "irrelevant_same_query": {
+      "n": 18,
+      "min": 0.541,
+      "p05": 0.549,
+      "median": 0.592,
+      "p95": 0.63,
+      "max": 0.644
+     },
+     "unrelated_queries": {
+      "n": 12,
+      "min": 0.521,
+      "p05": 0.53,
+      "median": 0.573,
+      "p95": 0.592,
+      "max": 0.596
+     },
+     "unrelated_excess": {
+      "n": 12,
+      "min": -0.043,
+      "p05": -0.034,
+      "median": 0.001,
+      "p95": 0.021,
+      "max": 0.022
+     },
+     "no_cutoff": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 12
+     },
+     "min_score_only": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": null,
+      "precision": null,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": null,
+      "precision": null,
+      "unrelated_shown": 0
+     }
+    },
+    "image->text": {
+     "threshold": 0.62,
+     "suggested": null,
+     "margin": 0.04,
+     "suggested_margin": null,
+     "relevant": {
+      "n": 0
+     },
+     "relevant_excess": {
+      "n": 0
+     },
+     "irrelevant_same_query": {
+      "n": 60,
+      "min": 0.518,
+      "p05": 0.531,
+      "median": 0.574,
+      "p95": 0.625,
+      "max": 0.639
+     },
+     "unrelated_queries": {
+      "n": 40,
+      "min": 0.507,
+      "p05": 0.52,
+      "median": 0.559,
+      "p95": 0.596,
+      "max": 0.601
+     },
+     "unrelated_excess": {
+      "n": 40,
+      "min": -0.057,
+      "p05": -0.039,
+      "median": -0.01,
+      "p95": 0.025,
+      "max": 0.035
+     },
+     "no_cutoff": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 40
+     },
+     "min_score_only": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": null,
+      "precision": 0.0,
+      "unrelated_shown": 0
+     }
+    },
+    "text->image": {
+     "threshold": 0.62,
+     "suggested": 0.67,
+     "margin": 0.06,
+     "suggested_margin": 0.11,
+     "relevant": {
+      "n": 19,
+      "min": 0.672,
+      "p05": 0.684,
+      "median": 0.743,
+      "p95": 0.805,
+      "max": 0.823
+     },
+     "relevant_excess": {
+      "n": 19,
+      "min": 0.119,
+      "p05": 0.128,
+      "median": 0.175,
+      "p95": 0.252,
+      "max": 0.299
+     },
+     "irrelevant_same_query": {
+      "n": 443,
+      "min": 0.439,
+      "p05": 0.486,
+      "median": 0.543,
+      "p95": 0.604,
+      "max": 0.705
+     },
+     "unrelated_queries": {
+      "n": 266,
+      "min": 0.449,
+      "p05": 0.47,
+      "median": 0.541,
+      "p95": 0.639,
+      "max": 0.673
+     },
+     "unrelated_excess": {
+      "n": 266,
+      "min": -0.091,
+      "p05": -0.053,
+      "median": -0.014,
+      "p95": 0.038,
+      "max": 0.098
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.026,
+      "unrelated_shown": 266
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.302,
+      "unrelated_shown": 31
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.655,
+      "unrelated_shown": 2
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.528,
+      "unrelated_shown": 5
+     }
+    },
+    "text->pdf": {
+     "threshold": 0.64,
+     "suggested": 0.62,
+     "margin": 0.11,
+     "suggested_margin": 0.15,
+     "relevant": {
+      "n": 4,
+      "min": 0.705,
+      "p05": 0.706,
+      "median": 0.725,
+      "p95": 0.799,
+      "max": 0.809
+     },
+     "relevant_excess": {
+      "n": 4,
+      "min": 0.15,
+      "p05": 0.155,
+      "median": 0.189,
+      "p95": 0.275,
+      "max": 0.288
+     },
+     "irrelevant_same_query": {
+      "n": 95,
+      "min": 0.421,
+      "p05": 0.452,
+      "median": 0.511,
+      "p95": 0.577,
+      "max": 0.597
+     },
+     "unrelated_queries": {
+      "n": 57,
+      "min": 0.414,
+      "p05": 0.458,
+      "median": 0.529,
+      "p95": 0.589,
+      "max": 0.618
+     },
+     "unrelated_excess": {
+      "n": 57,
+      "min": -0.073,
+      "p05": -0.047,
+      "median": -0.016,
+      "p95": 0.049,
+      "max": 0.07
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.026,
+      "unrelated_shown": 57
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "unrelated_shown": 0
+     }
+    },
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.61,
+     "margin": 0.1,
+     "suggested_margin": 0.13,
+     "relevant": {
+      "n": 12,
+      "min": 0.618,
+      "p05": 0.644,
+      "median": 0.763,
+      "p95": 0.818,
+      "max": 0.82
+     },
+     "relevant_excess": {
+      "n": 12,
+      "min": 0.133,
+      "p05": 0.135,
+      "median": 0.247,
+      "p95": 0.329,
+      "max": 0.337
+     },
+     "irrelevant_same_query": {
+      "n": 318,
+      "min": 0.369,
+      "p05": 0.447,
+      "median": 0.522,
+      "p95": 0.598,
+      "max": 0.665
+     },
+     "unrelated_queries": {
+      "n": 190,
+      "min": 0.408,
+      "p05": 0.449,
+      "median": 0.522,
+      "p95": 0.624,
+      "max": 0.7
+     },
+     "unrelated_excess": {
+      "n": 190,
+      "min": -0.106,
+      "p05": -0.063,
+      "median": -0.008,
+      "p95": 0.051,
+      "max": 0.09
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.023,
+      "unrelated_shown": 190
+     },
+     "min_score_only": {
+      "recall": 0.917,
+      "precision": 0.344,
+      "unrelated_shown": 12
+     },
+     "full_rule": {
+      "recall": 0.917,
+      "precision": 0.647,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 0.917,
+      "precision": 0.423,
+      "unrelated_shown": 6
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "40/42",
+     "unrelated_queries_with_results": "2/23",
+     "unrelated_with_results": [
+      "offside rule in ice hockey",
+      "相撲の番付の決め方"
+     ],
+     "relevant_hidden": [
+      "オンライン英会話の進め方 -> notes/language-exchange.md (0.618)",
+      "line-temperature -> images/stock-price.png (0.762)"
+     ],
+     "unlabelled_shown_per_query": 0.51,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "41/42",
+     "unrelated_queries_with_results": "7/23",
+     "unrelated_with_results": [
+      "...",
+      "hello",
+      "offside rule in ice hockey",
+      "qwpoeiru zmxn",
+      "xyz 123",
+      "ああああ",
+      "相撲の番付の決め方"
+     ],
+     "relevant_hidden": [
+      "オンライン英会話の進め方 -> notes/language-exchange.md (0.618)"
+     ],
+     "unlabelled_shown_per_query": 0.72
+    }
+   }
+  },
+  "recipes": {
+   "pairs": {
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.6,
+     "margin": 0.1,
+     "suggested_margin": 0.12,
+     "relevant": {
+      "n": 11,
+      "min": 0.665,
+      "p05": 0.677,
+      "median": 0.722,
+      "p95": 0.773,
+      "max": 0.781
+     },
+     "relevant_excess": {
+      "n": 11,
+      "min": 0.121,
+      "p05": 0.149,
+      "median": 0.204,
+      "p95": 0.255,
+      "max": 0.26
+     },
+     "irrelevant_same_query": {
+      "n": 99,
+      "min": 0.452,
+      "p05": 0.478,
+      "median": 0.542,
+      "p95": 0.595,
+      "max": 0.637
+     },
+     "unrelated_queries": {
+      "n": 30,
+      "min": 0.395,
+      "p05": 0.434,
+      "median": 0.504,
+      "p95": 0.589,
+      "max": 0.592
+     },
+     "unrelated_excess": {
+      "n": 30,
+      "min": -0.137,
+      "p05": -0.097,
+      "median": -0.038,
+      "p95": 0.007,
+      "max": 0.012
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.079,
+      "unrelated_shown": 30
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.786,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.786,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.786,
+      "unrelated_shown": 0
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "11/11",
+     "unrelated_queries_with_results": "0/3",
+     "unrelated_with_results": [],
+     "relevant_hidden": [],
+     "unlabelled_shown_per_query": 0.27,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "11/11",
+     "unrelated_queries_with_results": "0/3",
+     "unrelated_with_results": [],
+     "relevant_hidden": [],
+     "unlabelled_shown_per_query": 0.27
+    }
+   }
+  },
+  "sourdough": {
+   "pairs": {
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.6,
+     "margin": 0.1,
+     "suggested_margin": 0.08,
+     "relevant": {
+      "n": 12,
+      "min": 0.605,
+      "p05": 0.611,
+      "median": 0.691,
+      "p95": 0.748,
+      "max": 0.758
+     },
+     "relevant_excess": {
+      "n": 12,
+      "min": 0.079,
+      "p05": 0.084,
+      "median": 0.163,
+      "p95": 0.213,
+      "max": 0.214
+     },
+     "irrelevant_same_query": {
+      "n": 28,
+      "min": 0.448,
+      "p05": 0.454,
+      "median": 0.549,
+      "p95": 0.692,
+      "max": 0.711
+     },
+     "unrelated_queries": {
+      "n": 40,
+      "min": 0.442,
+      "p05": 0.463,
+      "median": 0.539,
+      "p95": 0.614,
+      "max": 0.643
+     },
+     "unrelated_excess": {
+      "n": 40,
+      "min": -0.068,
+      "p05": -0.067,
+      "median": -0.018,
+      "p95": 0.036,
+      "max": 0.049
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.15,
+      "unrelated_shown": 40
+     },
+     "min_score_only": {
+      "recall": 0.833,
+      "precision": 0.476,
+      "unrelated_shown": 2
+     },
+     "full_rule": {
+      "recall": 0.75,
+      "precision": 0.562,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 0.417,
+      "precision": 0.455,
+      "unrelated_shown": 1
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "9/12",
+     "unrelated_queries_with_results": "0/4",
+     "unrelated_with_results": [],
+     "relevant_hidden": [
+      "sourdough bread -> notes/bulk-fermentation.md (0.616)",
+      "sourdough bread -> notes/cold-proof.md (0.605)",
+      "how long should the dough rise -> notes/cold-proof.md (0.640)"
+     ],
+     "unlabelled_shown_per_query": 1.75,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "5/12",
+     "unrelated_queries_with_results": "1/4",
+     "unrelated_with_results": [
+      "asdf"
+     ],
+     "relevant_hidden": [
+      "sourdough bread -> notes/starter.md (0.700)",
+      "sourdough bread -> notes/baking.md (0.683)",
+      "sourdough bread -> notes/shaping.md (0.679)",
+      "sourdough bread -> notes/scoring.md (0.658)",
+      "sourdough bread -> notes/bulk-fermentation.md (0.616)",
+      "sourdough bread -> notes/cold-proof.md (0.605)",
+      "how long should the dough rise -> notes/cold-proof.md (0.640)"
+     ],
+     "unlabelled_shown_per_query": 1.25
+    }
+   }
+  },
+  "akiya": {
+   "pairs": {
+    "text->text": {
+     "threshold": 0.62,
+     "suggested": 0.6,
+     "margin": 0.1,
+     "suggested_margin": 0.17,
+     "relevant": {
+      "n": 7,
+      "min": 0.698,
+      "p05": 0.705,
+      "median": 0.744,
+      "p95": 0.825,
+      "max": 0.83
+     },
+     "relevant_excess": {
+      "n": 7,
+      "min": 0.174,
+      "p05": 0.177,
+      "median": 0.242,
+      "p95": 0.291,
+      "max": 0.298
+     },
+     "irrelevant_same_query": {
+      "n": 35,
+      "min": 0.521,
+      "p05": 0.532,
+      "median": 0.629,
+      "p95": 0.695,
+      "max": 0.711
+     },
+     "unrelated_queries": {
+      "n": 24,
+      "min": 0.441,
+      "p05": 0.449,
+      "median": 0.532,
+      "p95": 0.571,
+      "max": 0.595
+     },
+     "unrelated_excess": {
+      "n": 24,
+      "min": -0.069,
+      "p05": -0.064,
+      "median": -0.012,
+      "p95": 0.035,
+      "max": 0.042
+     },
+     "no_cutoff": {
+      "recall": 1.0,
+      "precision": 0.106,
+      "unrelated_shown": 24
+     },
+     "min_score_only": {
+      "recall": 1.0,
+      "precision": 0.269,
+      "unrelated_shown": 0
+     },
+     "full_rule": {
+      "recall": 1.0,
+      "precision": 0.35,
+      "unrelated_shown": 0
+     },
+     "legacy_median_rule": {
+      "recall": 1.0,
+      "precision": 0.269,
+      "unrelated_shown": 0
+     }
+    }
+   },
+   "summary": {
+    "full_rule": {
+     "relevant_shown": "7/7",
+     "unrelated_queries_with_results": "0/4",
+     "unrelated_with_results": [],
+     "relevant_hidden": [],
+     "unlabelled_shown_per_query": 1.86,
+     "relevant_outside_top10": []
+    },
+    "legacy_median_rule": {
+     "relevant_shown": "7/7",
+     "unrelated_queries_with_results": "0/4",
+     "unrelated_with_results": [],
+     "relevant_hidden": [],
+     "unlabelled_shown_per_query": 2.71
+    }
+   }
+  }
+ }
+}

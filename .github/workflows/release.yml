@@ -1,0 +1,74 @@
+name: Release
+
+# Publishes to PyPI when a version tag (v0.1.0, v0.2.0, ...) is pushed.
+# Uses PyPI Trusted Publishing (OpenID Connect): no API token or secret is stored
+# in this repository. The publisher must be configured once on pypi.org; see
+# docs/RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check that the tag matches the package version
+        shell: bash
+        run: |
+          version=$(python -c "import re,pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('src/anygrep/__init__.py').read_text()).group(1))")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match __version__ $version" >&2
+            exit 1
+          fi
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Smoke test the wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/wheeltest"
+          "$RUNNER_TEMP/wheeltest"/bin/pip install dist/*.whl
+          "$RUNNER_TEMP/wheeltest"/bin/anygrep --version
+          "$RUNNER_TEMP/wheeltest"/bin/anygrep --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/anygrep/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "anygrep $GITHUB_REF_NAME" --notes "See CHANGELOG.md for the changes in this release."
