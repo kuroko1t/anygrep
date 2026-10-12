@@ -136,10 +136,23 @@ def fts_available(db: sqlite3.Connection | None = None) -> bool:
     return _fts_ok
 
 
-def _corrupt(e: sqlite3.DatabaseError) -> bool:
+def _corrupt(e: sqlite3.DatabaseError, fts_write: bool = False) -> bool:
     """True for an error that says the data is damaged, not that the
-    database is busy, locked or otherwise unusable for now."""
-    return type(e) is sqlite3.DatabaseError
+    database is busy, locked or otherwise unusable for now. With
+    `fts_write` (a statement that writes only the FTS index from the chunk
+    rows), a constraint failure counts too: FTS5 reports some damage to its
+    own tables that way, and the rows it is given (chunk ids and text) can
+    break no constraint of an intact index. Constraint failures of the
+    other tables are never taken for damage. FTS5 reports damage to its
+    settings as an error of its own ("invalid fts5 file format")."""
+    if type(e) is sqlite3.DatabaseError:
+        return True
+    if isinstance(e, sqlite3.OperationalError) and str(e).startswith("invalid fts5 file format"):
+        return True
+    if not fts_write or not isinstance(e, sqlite3.IntegrityError):
+        return False
+    name = getattr(e, "sqlite_errorname", None)  # Python 3.11+
+    return name is None or name.startswith("SQLITE_CONSTRAINT")
 
 
 def _create_private(path: Path) -> None:
@@ -367,7 +380,7 @@ class Store:
                     self.set_meta("schema_version", str(SCHEMA_VERSION))
             if supported and (not has_table or self.get_meta("fts_format") != FTS_FORMAT):
                 with self.transaction():
-                    self.db.execute(f"DROP TABLE IF EXISTS {FTS_TABLE}")
+                    self._fts_drop()
                     self.db.execute(FTS_SCHEMA)
                     self.set_meta("fts_format", FTS_FORMAT)
                     self.delete_meta("fts_reset")
@@ -392,9 +405,103 @@ class Store:
         with self.transaction():
             if self.get_meta("fts_reset") is None:
                 return
-            self.db.execute(f"INSERT INTO {FTS_TABLE}({FTS_TABLE}) VALUES('delete-all')")
+            # A new table rather than 'delete-all': the old one may be damaged.
+            self._fts_drop()
+            self.db.execute(FTS_SCHEMA)
             self._fts_mark_gap(0)
             self.delete_meta("fts_reset")
+        self.fts = True
+
+    def _fts_drop(self) -> None:
+        """Drop the FTS table, also when it is too damaged to be opened (its
+        structure record or settings): those are then put back as an empty
+        table has them, which lets SQLite open and drop it. Call inside a
+        transaction."""
+        if not self._has_table(FTS_TABLE):
+            return
+        self.db.execute("SAVEPOINT anygrep_fts_drop")
+        try:
+            self.db.execute(f"DROP TABLE {FTS_TABLE}")
+        except sqlite3.DatabaseError as e:
+            if not self.db.in_transaction:
+                raise
+            self.db.execute("ROLLBACK TO anygrep_fts_drop")
+            self.db.execute("RELEASE anygrep_fts_drop")
+            if not _corrupt(e):
+                raise
+        else:
+            self.db.execute("RELEASE anygrep_fts_drop")
+            return
+        fresh = "anygrep_fts_fresh"
+        self.db.execute(f"DROP TABLE IF EXISTS temp.{fresh}")
+        self.db.execute(FTS_SCHEMA.replace(FTS_TABLE, f"temp.{fresh}", 1))
+        try:
+            for part in ("data", "idx", "docsize", "config"):
+                if self._has_table(f"{FTS_TABLE}_{part}"):
+                    self.db.execute(f"DELETE FROM main.{FTS_TABLE}_{part}")
+            for part in ("data", "config"):
+                if self._has_table(f"{FTS_TABLE}_{part}"):
+                    self.db.execute(
+                        f"INSERT INTO main.{FTS_TABLE}_{part} SELECT * FROM temp.{fresh}_{part}"
+                    )
+        finally:
+            self.db.execute(f"DROP TABLE temp.{fresh}")
+        self.db.execute(f"DROP TABLE {FTS_TABLE}")
+
+    def _fts_check(self) -> None:
+        """Look up the first and the last chunk the FTS index holds by a
+        trigram of their own text. A lookup that fails, or that misses the
+        chunk (a damaged structure record can make every lookup find
+        nothing, without an error), records that the index must be made
+        again. Call in a writer, outside a transaction."""
+        if not self._fts_current():
+            return
+        live, more = self._fts_live()
+        for order in ("ASC", "DESC"):
+            row = self.db.execute(
+                f"SELECT id, text FROM chunks WHERE text IS NOT NULL AND {live} "
+                f"ORDER BY id {order} LIMIT 1",
+                more,
+            ).fetchone()
+            if row is None:
+                return
+            folded = fold(row[1])
+            if len(folded) < 3:
+                continue
+            try:
+                ok = self.db.execute(
+                    f"SELECT 1 FROM {FTS_TABLE} WHERE {FTS_TABLE} MATCH ? AND rowid = ?",
+                    (_fts_query(folded[:3]), row[0]),
+                ).fetchone()
+            except sqlite3.DatabaseError as e:
+                if not _corrupt(e):
+                    raise
+                ok = None
+            if ok is None:
+                self._fts_damaged()
+                return
+
+    def _fts_damaged(self) -> None:
+        """Record that a read found the FTS index damaged, so that the next
+        update makes it again (lookups read the chunk text until then). A
+        read-only store, or one another process is writing, leaves that to
+        the check of the next fill_fts()."""
+        if self.readonly or self.get_meta("fts_reset") is not None:
+            return
+        if self.db.in_transaction:
+            self.set_meta("fts_reset", "1")
+            self.fts = False
+            return
+        (wait,) = self.db.execute("PRAGMA busy_timeout").fetchone()
+        try:
+            self.db.execute("PRAGMA busy_timeout=0")
+            with self.transaction():
+                self.set_meta("fts_reset", "1")
+            self.fts = False
+        except sqlite3.OperationalError:  # busy: the next check finds it
+            pass
+        finally:
+            self.db.execute(f"PRAGMA busy_timeout={int(wait)}")
 
     def _has_table(self, name: str) -> bool:
         return (
@@ -440,53 +547,64 @@ class Store:
 
     def fill_fts(self, max_seconds: float | None = None, quiet: bool = True) -> bool:
         """Add the chunks of the gap to the FTS index, in short transactions
-        (an interrupted run keeps what is done). True when none is left."""
+        (an interrupted run keeps what is done). True when none is left.
+        When a batch finds the index damaged, its position is kept, and the
+        index is made again from the chunk text (chunks and vectors stay);
+        a second failure in the same run leaves that for the next one."""
         if self.readonly or not fts_available(self.db) or not self._has_table(FTS_TABLE):
-            return True
-        self._fts_apply_reset()
-        if not self._fts_writes():
-            return True
-        gap = self.fts_gap()
-        if gap is None:
             return True
         from tqdm import tqdm
 
         start = time.monotonic()
-        pos, end = gap
-        bar = tqdm(
-            total=end - pos, disable=quiet, desc="Exact-match index", file=sys.stderr,
-            delay=1.0, dynamic_ncols=True, leave=False,
-        )  # fmt: skip
-        try:
-            while pos < end:
-                if max_seconds is not None and time.monotonic() - start > max_seconds:
-                    return False
-                with self.transaction():
-                    gap = self.fts_gap()
-                    if gap is None or not self._fts_writes():
-                        return True
-                    pos, end = gap
-                    r = self.db.execute(
-                        "SELECT id FROM chunks WHERE id > ? AND id <= ? ORDER BY id "
-                        "LIMIT 1 OFFSET ?",
-                        (pos, end, FTS_BATCH - 1),
-                    ).fetchone()
-                    upto = end if r is None else r[0]
-                    self._fts_exec(
-                        f"INSERT INTO {FTS_TABLE}(rowid, text) "
-                        "SELECT id, anygrep_fold(text) FROM chunks WHERE id > ? AND id <= ?",
-                        (pos, upto),
-                    )
-                    if upto >= end:
-                        self.delete_meta("fts_pos")
-                        self.delete_meta("fts_end")
-                    else:
-                        self.set_meta("fts_pos", str(upto))
-                bar.update(upto - pos)
-                pos = upto
-        finally:
-            bar.close()
-        return True
+        self._fts_check()
+        for _attempt in range(2):
+            self._fts_apply_reset()
+            if not self._fts_writes():
+                return self.get_meta("fts_reset") is None
+            gap = self.fts_gap()
+            if gap is None:
+                return True
+            pos, end = gap
+            bar = tqdm(
+                total=end - pos, disable=quiet, desc="Exact-match index", file=sys.stderr,
+                delay=1.0, dynamic_ncols=True, leave=False,
+            )  # fmt: skip
+            try:
+                while pos < end:
+                    if max_seconds is not None and time.monotonic() - start > max_seconds:
+                        return False
+                    with self.transaction():
+                        if not self._fts_writes():
+                            break
+                        gap = self.fts_gap()
+                        if gap is None:
+                            return True
+                        pos, end = gap
+                        r = self.db.execute(
+                            "SELECT id FROM chunks WHERE id > ? AND id <= ? ORDER BY id "
+                            "LIMIT 1 OFFSET ?",
+                            (pos, end, FTS_BATCH - 1),
+                        ).fetchone()
+                        upto = end if r is None else r[0]
+                        self._fts_exec(
+                            f"INSERT INTO {FTS_TABLE}(rowid, text) "
+                            "SELECT id, anygrep_fold(text) FROM chunks WHERE id > ? AND id <= ?",
+                            (pos, upto),
+                        )
+                        if not self.fts:  # damaged: rebuilt below, from the start
+                            break
+                        if upto >= end:
+                            self.delete_meta("fts_pos")
+                            self.delete_meta("fts_end")
+                        else:
+                            self.set_meta("fts_pos", str(upto))
+                    bar.update(upto - pos)
+                    pos = upto
+                else:
+                    return self.fts_gap() is None
+            finally:
+                bar.close()
+        return False
 
     def _fts_writes(self) -> bool:
         """Whether chunk writes must update the FTS index. Call inside a
@@ -503,13 +621,25 @@ class Store:
         (rows changed by a program that did not keep it), the chunks are
         still written, and the index is rebuilt from them by the next
         update; until then lookups read the chunk text."""
+        self.db.execute("SAVEPOINT anygrep_fts")
         try:
             self.db.execute(sql, list(params))
+            # FTS5 keeps new rows in memory until a savepoint or the commit
+            # and only then finds damage; write them now, so that a failure
+            # undoes just this statement instead of failing the commit.
+            self.db.execute("SAVEPOINT anygrep_fts_flush")
+            self.db.execute("RELEASE anygrep_fts_flush")
         except sqlite3.DatabaseError as e:
-            if not _corrupt(e):
+            if not self.db.in_transaction:  # SQLite rolled back everything
+                raise
+            self.db.execute("ROLLBACK TO anygrep_fts")
+            self.db.execute("RELEASE anygrep_fts")
+            if not _corrupt(e, fts_write=True):
                 raise
             self.set_meta("fts_reset", "1")
             self.fts = False
+        else:
+            self.db.execute("RELEASE anygrep_fts")
 
     def _fts_delete(self, where: str, params: Iterable) -> None:
         """Take the chunks matching `where` out of the FTS index (before they
@@ -565,6 +695,7 @@ class Store:
             except sqlite3.DatabaseError as e:
                 if not _corrupt(e):
                     raise
+                self._fts_damaged()
             else:
                 # One trigram that is the whole query: the lookup is exact.
                 if len(needle) == 3 and pat is None:

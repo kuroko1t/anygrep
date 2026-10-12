@@ -421,3 +421,260 @@ def drop_fts(path: Path) -> None:
     db.execute(f"DROP TABLE {store.FTS_TABLE}")
     db.commit()
     db.close()
+
+
+def partly_filled(path: Path, docs: Path, emb: FakeEmbedder, monkeypatch) -> Store:
+    """An index whose FTS table holds only the first batch of chunks (two
+    images and two texts)."""
+    st = Store(path)
+    index(st, docs, emb)
+    st.close()
+    drop_fts(path)
+    monkeypatch.setattr(store, "FTS_BATCH", 4)
+    st = Store(path)
+    clock = iter([0.0, 0.0, 100.0])
+    with monkeypatch.context() as m:
+        m.setattr(store.time, "monotonic", lambda: next(clock, 100.0))
+        assert st.fill_fts(max_seconds=1) is False
+    pos, end = st.fts_gap()
+    assert pos == 4 < end
+    return st
+
+
+def damage_fts(path: Path) -> None:
+    db = sqlite3.connect(path)
+    db.execute(f"UPDATE {store.FTS_TABLE}_data SET block=x'ffffffff' WHERE id>1")
+    db.commit()
+    db.close()
+
+
+def test_damage_found_while_filling_rebuilds_the_table(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, monkeypatch
+) -> None:
+    """A partly filled FTS table that is damaged: the next fill makes it
+    again from the chunks instead of failing on every update."""
+    path = tmp_path / "idx.sqlite"
+    st = partly_filled(path, docs, fake_embedder, monkeypatch)
+    chunks = st.db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+    damage_fts(path)
+    assert st.fill_fts() is True
+    assert st.exact_state() == "ready" and st.get_meta("fts_reset") is None
+    assert st.db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] == chunks
+    check(st)
+    assert query(st, fake_embedder, "LX-4471")[0].exact
+    assert query(st, fake_embedder, "ABC-77812")[0].exact
+    # Updates go on, and the table stays right.
+    (docs / "notes" / "invoice.md").write_text("Reference GHI-5550 now.\n")
+    index(st, docs, fake_embedder)
+    assert st.fill_fts() is True
+    check(st)
+    assert query(st, fake_embedder, "GHI-5550")[0].exact
+    assert not any(h.exact for h in query(st, fake_embedder, "ABC-77812"))
+
+
+def test_update_after_damage_while_filling(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, monkeypatch
+) -> None:
+    path = tmp_path / "idx.sqlite"
+    st = partly_filled(path, docs, fake_embedder, monkeypatch)
+    st.close()
+    damage_fts(path)
+    st = Store(path)
+    (docs / "notes" / "new.md").write_text("Another one: JKL-9090.\n")
+    from anygrep.indexer import update_index
+
+    update_index(st, [docs], IndexOptions(quiet=True), lambda vision: fake_embedder)
+    st.fill_fts()
+    assert st.exact_state() == "ready"
+    check(st)
+    for q in ("JKL-9090", "LX-4471", "ABC-77812"):
+        assert query(st, fake_embedder, q)[0].exact, q
+
+
+class FailingFTSInserts:
+    """A connection whose inserts into the FTS table fail as FTS5 reports
+    some damage."""
+
+    def __init__(self, db: sqlite3.Connection) -> None:
+        self._db = db
+
+    def execute(self, sql: str, *args):
+        if sql.startswith(f"INSERT INTO {store.FTS_TABLE}(rowid"):
+            raise sqlite3.IntegrityError("constraint failed")
+        return self._db.execute(sql, *args)
+
+    def __getattr__(self, name: str):
+        return getattr(self._db, name)
+
+
+def test_failed_batch_is_not_counted_as_filled(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, monkeypatch
+) -> None:
+    """When even the new table fails, the fill reports that it is not done
+    and keeps the position of the batch that failed."""
+    path = tmp_path / "idx.sqlite"
+    st = partly_filled(path, docs, fake_embedder, monkeypatch)
+    real = st.db
+    st.db = FailingFTSInserts(real)
+    assert st.fill_fts() is False
+    assert st.get_meta("fts_reset") == "1" and st.exact_state() == "building"
+    assert st.fts_gap()[0] == 0  # nothing counted as filled
+    assert query(st, fake_embedder, "LX-4471")[0].exact  # read from the chunks
+    st.db = real
+    assert st.fill_fts() is True
+    check(st)
+
+
+def test_constraint_errors_of_other_tables_are_not_damage(tmp_path: Path) -> None:
+    db = sqlite3.connect(tmp_path / "t.sqlite")
+    db.execute("CREATE TABLE t(id INTEGER PRIMARY KEY)")
+    db.execute("INSERT INTO t VALUES(1)")
+    with pytest.raises(sqlite3.IntegrityError) as e:
+        db.execute("INSERT INTO t VALUES(1)")
+    assert not store._corrupt(e.value)
+    assert store._corrupt(e.value, fts_write=True)  # only for FTS writes
+    assert not store._corrupt(sqlite3.OperationalError("database is locked"), fts_write=True)
+    db.close()
+
+
+def built(path: Path, docs: Path, emb: FakeEmbedder, damage: str) -> None:
+    """A complete index whose FTS tables are then changed by `damage`."""
+    st = Store(path)
+    index(st, docs, emb)
+    st.close()
+    db = sqlite3.connect(path)
+    db.execute(damage.format(t=store.FTS_TABLE))
+    db.commit()
+    db.close()
+
+
+def update(st: Store, docs: Path, emb: FakeEmbedder) -> None:
+    from anygrep.indexer import update_index
+
+    update_index(st, [docs], IndexOptions(quiet=True), lambda vision: emb)
+
+
+@pytest.mark.parametrize("block", ["x'ffffffff'", "x'00'", "x''"])
+def test_damaged_structure_record_found_without_changes(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, block: str
+) -> None:
+    """A damaged structure record can make every lookup find nothing, with
+    no error: the next update notices it and makes the table again."""
+    path = tmp_path / "idx.sqlite"
+    built(path, docs, fake_embedder, f"UPDATE {{t}}_data SET block={block} WHERE id=10")
+    st = Store(path, readonly=True)
+    query(st, fake_embedder, "LX-4471")  # no error
+    st.close()
+    st = Store(path)
+    update(st, docs, fake_embedder)
+    assert st.exact_state() == "ready" and st.get_meta("fts_reset") is None
+    check(st)
+    for q in ("LX-4471", "ABC-77812"):
+        assert query(st, fake_embedder, q)[0].exact, q
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "UPDATE {t}_data SET block=substr(block, 1, length(block) / 2) "
+        "WHERE id=(SELECT max(id) FROM {t}_data)",
+        "DELETE FROM {t}_data WHERE id>10",
+    ],
+)
+def test_damage_found_by_a_lookup_is_recorded(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, damage: str
+) -> None:
+    path = tmp_path / "idx.sqlite"
+    built(path, docs, fake_embedder, damage)
+    ro = Store(path, readonly=True)
+    assert query(ro, fake_embedder, "LX-4471")[0].exact  # read from the chunks
+    ro.close()
+    st = Store(path)
+    assert query(st, fake_embedder, "LX-4471")[0].exact
+    assert st.get_meta("fts_reset") == "1"
+    assert st.fill_fts() is True
+    assert st.exact_state() == "ready"
+    check(st)
+    assert query(st, fake_embedder, "ABC-77812")[0].exact
+
+
+def test_damage_seen_only_by_a_reader_is_found_by_the_next_update(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff
+) -> None:
+    path = tmp_path / "idx.sqlite"
+    built(path, docs, fake_embedder, "DELETE FROM {t}_data WHERE id>10")
+    st = Store(path)
+    update(st, docs, fake_embedder)
+    assert st.exact_state() == "ready"
+    check(st)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "DELETE FROM {t}_data WHERE id=10",
+        "UPDATE {t}_config SET v=99 WHERE k='version'",
+    ],
+)
+def test_table_that_cannot_be_opened_is_made_again(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff, damage: str
+) -> None:
+    """A missing structure record or broken settings: SQLite cannot even
+    drop the table, yet searches work and updates make it again."""
+    path = tmp_path / "idx.sqlite"
+    built(path, docs, fake_embedder, damage)
+    ro = Store(path, readonly=True)
+    assert query(ro, fake_embedder, "LX-4471")[0].exact
+    ro.close()
+    st = Store(path)
+    (docs / "notes" / "new.md").write_text("Another one: JKL-9090.\n")
+    update(st, docs, fake_embedder)
+    st.close()
+    for _ in range(2):  # later runs open and update it too
+        st = Store(path)
+        update(st, docs, fake_embedder)
+        assert st.exact_state() == "ready" and st.get_meta("fts_reset") is None
+        check(st)
+        for q in ("JKL-9090", "LX-4471", "ABC-77812"):
+            assert query(st, fake_embedder, q)[0].exact, q
+        st.close()
+    db = sqlite3.connect(path)
+    assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    db.close()
+
+
+class DamageOnFirstWrite(FailingFTSInserts):
+    """A connection whose first write to the FTS table fails as damage."""
+
+    failed = False
+
+    def execute(self, sql: str, *args):
+        if not self.failed and sql.startswith(f"INSERT INTO {store.FTS_TABLE}("):
+            self.failed = True
+            raise sqlite3.DatabaseError("database disk image is malformed")
+        return self._db.execute(sql, *args)
+
+
+def test_one_update_completes_the_table_after_damage(
+    tmp_path: Path, docs: Path, fake_embedder, cutoff
+) -> None:
+    """Damage found by a write during `anygrep index`: the same run makes
+    the table again, so it is complete when the run ends."""
+    path = tmp_path / "idx.sqlite"
+    st = Store(path)
+    index(st, docs, fake_embedder)
+    real = st.db
+    st.db = DamageOnFirstWrite(real)
+    (docs / "notes" / "invoice.md").write_text("Reference ZZQ-31337 now.\n")
+    update(st, docs, fake_embedder)
+    assert st.db.failed
+    st.db = real
+    assert st.exact_state() == "ready" and st.fts_gap() is None
+    check(st)
+    assert query(st, fake_embedder, "ZZQ-31337")[0].exact
+
+
+def test_settings_error_counts_as_damage() -> None:
+    e = sqlite3.OperationalError("invalid fts5 file format (found 99, expected 4 or 5)")
+    assert store._corrupt(e)
+    assert not store._corrupt(sqlite3.OperationalError("no such table: x"))

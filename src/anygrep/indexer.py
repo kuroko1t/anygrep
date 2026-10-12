@@ -777,6 +777,10 @@ def update_index(
     store.set_meta("text_exts", ",".join(sorted(opts.extra_text_exts)))
     store.fill_fts(quiet=opts.quiet)  # an index made before exact matching
     rep = run_index(store, roots, opts, get_embedder, calibrate=calibrate)
+    if not rep.interrupted and (store.fts_gap() or store.get_meta("fts_reset")):
+        # Damage found during the run: the table is made again now, so that
+        # one run leaves it complete.
+        store.fill_fts(quiet=opts.quiet)
     rep.removed += dropped
     if opts.images and not rep.interrupted:
         # Only now are the indexed images (re-)embedded with this budget.
