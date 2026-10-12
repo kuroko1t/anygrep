@@ -19,7 +19,7 @@ pipx install anygrep        # or: uv tool install anygrep
 uvx anygrep "when is the tax return due" ~/notes   # or try it without installing
 ```
 
-Requires Python 3.10+. Tested on Linux, Windows 11 and macOS (Apple silicon, in CI). The model files
+Requires Python 3.10+. Tested on Linux; CI also runs the tests on Windows and macOS (Apple silicon). The model files
 (about 540 MB) are downloaded on first use. See [docs/usage.md](docs/usage.md#installing) for Intel Macs,
 Windows on ARM and uninstalling.
 
