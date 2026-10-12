@@ -989,9 +989,20 @@ def test_index_exits_2_when_a_file_failed(env, corpus: Path, capsys) -> None:
     (corpus / "broken.png").write_bytes(b"\x89PNG not really")
     code, out, err = run(capsys, "index", "-q", str(corpus))
     assert code == 2 and out == "" and err == ""
-    code, _, err = run(capsys, "index", str(corpus))  # not retried: nothing failed now
-    assert code == 0 and "failed" not in err
+    # Not tried again while unchanged, but still failed: the status says so.
+    code, _, err = run(capsys, "index", str(corpus))
+    assert code == 2 and "1 still failed from an earlier run" in err and "--problems" in err
+    code, out, err = run(capsys, "index", "-q", str(corpus))
+    assert code == 2 and out == "" and err == ""
+    os.utime(corpus / "broken.png")  # touched, same content: still not retried
+    code, _, err = run(capsys, "index", str(corpus))
+    assert code == 2 and "1 still failed" in err
     (corpus / "notes" / "more.md").write_text("# More\n\nAnother note.\n", encoding="utf-8")
     (corpus / "broken2.png").write_bytes(b"\x89PNG not really")
     code, _, err = run(capsys, "index", str(corpus))
     assert code == 2 and "1 new" in err and "1 failed" in err  # the summary still prints
+    assert "1 still failed" in err
+    (corpus / "broken.png").unlink()
+    (corpus / "broken2.png").unlink()
+    code, _, err = run(capsys, "index", str(corpus))
+    assert code == 0 and "failed" not in err

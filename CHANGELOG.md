@@ -8,8 +8,10 @@ All notable changes to anygrep are listed here. The format follows
 
 ### Changed
 
-- `anygrep index` exits with status 2 when a file failed to index (it still indexes the rest and
-  prints the summary). Skipped files do not count. Before, it exited with 0.
+- `anygrep index` exits with status 2 while a file under its PATHs has failed to index (it still
+  indexes the rest and prints the summary). That includes a file that failed in an earlier run and
+  was not tried again because it has not changed; the summary counts it as "still failed from an
+  earlier run". Skipped files do not count. Before, it exited with 0.
 
 ### Fixed
 
@@ -18,6 +20,12 @@ All notable changes to anygrep are listed here. The format follows
   `--stop` fails instead of killing.
 - `index --stop` right after `index --background` (before the index file exists) stops the job
   instead of saying none is running.
+- `index --stop` while a background job is still starting cancels it: its worker exits without
+  indexing. Before, the stop was reported but the job then ran anyway. A worker also never writes
+  to the state of a job that is not its own.
+- A background job's start time is read in a fixed time zone on macOS, so a shell with another `TZ`
+  no longer takes a running job for a dead one.
+- Python API: `type=["PDF", "Image"]` is accepted like `type="PDF, Image"`.
 - Python API: calling the same `Index` from the `progress` callback of `update()` raises `RuntimeError`.
   A search from there could record images at the wrong token budget, and an update from there released
   the writer lock early.

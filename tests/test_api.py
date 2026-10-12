@@ -460,3 +460,12 @@ def test_empty_index_does_not_load_the_model(tmp_path: Path, loads, corpus: Path
         assert idx.search("hello") == []
         assert idx.search(image=corpus / "red.png") == []
         assert loads == []
+
+
+def test_type_accepts_the_same_spellings_as_a_string_or_a_list() -> None:
+    from anygrep.api import _kinds
+
+    assert _kinds("PDF, Image") == _kinds(["PDF", " image"]) == ["image", "pdf"]
+    assert _kinds(("Text", "PDF", "IMAGE")) is None  # every type
+    with pytest.raises(ValueError, match="type must be"):
+        _kinds(["pdf", "video"])

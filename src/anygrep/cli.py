@@ -399,6 +399,8 @@ def _index_summary(args, rep) -> int:
             parts.append(f"{rep.skipped} skipped")
         if rep.errors:
             parts.append(f"{rep.errors} failed")
+        if rep.still_failed:
+            parts.append(f"{rep.still_failed} still failed from an earlier run")
         head = "Stopped after" if rep.interrupted else "Done in"
         _err(f"{head} {_fmt_secs(rep.seconds)}: " + ", ".join(parts) + ".")
         for k, n in sorted(rep.by_kind_files.items()):
@@ -409,12 +411,14 @@ def _index_summary(args, rep) -> int:
             _err(f"  {n} identical image{'s' * (n != 1)} reused (not embedded again).")
         if rep.deferred_images:
             _err(f"  {rep.deferred_images} images not indexed (--no-images).")
-        if rep.skipped or rep.errors:
+        if rep.skipped or rep.errors or rep.still_failed:
             _err(f"  See `{_hint('status')} --problems` for skipped or failed files.")
     if rep.interrupted:
         _err("Interrupted. Finished files are saved; run the same command again to resume.")
         return EXIT_INTERRUPTED
-    return EXIT_ERROR if rep.errors else 0
+    # A failed file that has not changed is not tried again, but it still
+    # counts: a scheduled `anygrep index || alert` keeps reporting it.
+    return EXIT_ERROR if rep.errors or rep.still_failed else 0
 
 
 # ---------------------------------------------------------------- background
@@ -570,6 +574,9 @@ def _index_background(args) -> int:
             f"anygrep: indexing {where} in the background ({_hint('status')}; "
             f"stop with {_hint('index --stop')})"
         )
+    elif r.result == "cancelled":
+        _err(f"anygrep: the background index of {where} was stopped before it started")
+        return EXIT_INTERRUPTED
     elif r.result == "attached":
         _err(f"anygrep: {where} is already being indexed in the background ({_hint('status')})")
     else:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import sys
@@ -475,3 +476,91 @@ def test_stop_kills_its_own_worker(reused_pid, monkeypatch) -> None:
     r = job.stop(index, timeout=0.5)
     assert killed == [4242] and r.result == "stopped"
     assert not job.job_paths(index).state.exists()
+
+
+# 12 --------------------------------------------------------------- stop while starting
+def _worker_args(index: Path, job_id: str, folder: Path):
+    args = cli.parse_args(
+        ["index", "--run-job", "--job-id", job_id, "--db", str(index), "--", str(folder)]
+    )
+    args.threads = 1
+    return args
+
+
+def test_stop_during_a_slow_spawn_cancels_the_job(tmp_path: Path, monkeypatch) -> None:
+    import threading
+
+    index = tmp_path / "index.sqlite"
+    release = threading.Event()
+    started = threading.Event()
+
+    def slow_spawn(argv, log, cwd):
+        started.set()
+        assert release.wait(10)
+        return 999_999_997  # a fake PID: not a child of this process, never signalled
+
+    monkeypatch.setattr(job, "spawn", slow_spawn)
+    monkeypatch.setattr(job, "_kill", lambda pid: pytest.fail("nothing may be killed"))
+    out: list[job.Request] = []
+    t = threading.Thread(target=lambda: out.append(job.request(index, [str(tmp_path)], 1, [])))
+    t.start()
+    try:
+        assert started.wait(10)
+        job_id = job.read_state(index).job_id
+        r = job.stop(index, timeout=0.3)
+        assert r.result == "stopped"
+        st = job.read_state(index)
+        assert st.phase == "cancelled" and st.job_id == job_id
+        assert job.job_paths(index).stop.exists()
+        # A worker that gets going before the spawn returns exits at once,
+        # without opening the index or touching the state.
+        assert job.run_worker(_worker_args(index, job_id, tmp_path)) == cli.EXIT_INTERRUPTED
+        assert not index.exists() and job.read_state(index).phase == "cancelled"
+    finally:
+        release.set()
+        t.join(10)
+    assert out[0].result == "cancelled"
+    assert job.read_state(index) is None and not job.job_paths(index).stop.exists()
+    assert job.run_worker(_worker_args(index, job_id, tmp_path)) == cli.EXIT_INTERRUPTED
+    assert not index.exists()
+    # Nothing is left that reads as a lost job.
+    assert job.check(index) == (None, None)
+
+
+def test_a_late_worker_does_not_take_over_a_newer_job(tmp_path: Path) -> None:
+    index = tmp_path / "index.sqlite"
+    newer = job.JobState(job_id="b" * 32, pid=4242, pid_start="b", phase="text",
+                         started_at=time.time(), scope=[str(tmp_path)])  # fmt: skip
+    job.write_state(index, newer)
+    before = job.job_paths(index).state.read_text(encoding="utf-8")
+    late = job._Worker(index, "a" * 32)
+    with pytest.raises(KeyboardInterrupt):
+        late.update(phase="planning")
+    assert late.should_stop()
+    with contextlib.suppress(KeyboardInterrupt):
+        late.update(phase="failed", error="the index was busy")
+    assert job.job_paths(index).state.read_text(encoding="utf-8") == before
+    job.request_stop(index)  # the newer job's stop request stays for it
+    assert job.run_worker(_worker_args(index, "a" * 32, tmp_path)) == cli.EXIT_INTERRUPTED
+    assert job.job_paths(index).state.read_text(encoding="utf-8") == before
+    assert job.job_paths(index).stop.exists() and not index.exists()
+    # Its own worker still updates it.
+    job._Worker(index, "b" * 32).update(files_done=3)
+    st = job.read_state(index)
+    assert st.files_done == 3 and st.pid == os.getpid()
+
+
+def test_process_start_does_not_depend_on_the_time_zone(monkeypatch) -> None:
+    import shutil
+
+    if shutil.which("ps") is None:
+        pytest.skip("no ps here")
+    monkeypatch.setattr(job.sys, "platform", "darwin")  # the `ps -o lstart=` path
+    monkeypatch.setenv("TZ", "Asia/Tokyo")
+    tokyo = job.process_start(os.getpid())
+    if tokyo is None:
+        pytest.skip("ps -o lstart is not available here")
+    monkeypatch.setenv("TZ", "UTC")
+    assert job.process_start(os.getpid()) == tokyo
+    monkeypatch.setenv("TZ", "America/Los_Angeles")
+    assert job.process_start(os.getpid()) == tokyo

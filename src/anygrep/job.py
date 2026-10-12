@@ -75,7 +75,9 @@ class JobState:
     threads: int = 1
     scope: list[str] = field(default_factory=list)
     queue: list[list[str]] = field(default_factory=list)
-    phase: str = "starting"  # starting, planning, text, images, failed
+    # starting, planning, text, images, failed, or cancelled (stopped before
+    # its worker took over: the worker exits when it sees it)
+    phase: str = "starting"
     files_total: int = 0
     files_done: int = 0
     text_total: int = 0
@@ -234,8 +236,10 @@ def process_start(pid: int) -> str | None:
             boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
             return f"{boot}:{ticks}"
         out = subprocess.run(
+            # lstart is local time: a fixed zone, so a shell or launchd agent
+            # with another TZ reads the same start time.
             ["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-            timeout=5, env={**os.environ, "LC_ALL": "C"},
+            timeout=5, env={**os.environ, "LC_ALL": "C", "TZ": "UTC0"},
         )  # fmt: skip
         return out.stdout.strip() or None
     except (OSError, IndexError, ValueError, subprocess.SubprocessError):
@@ -277,7 +281,7 @@ def lock_held(index: Path) -> bool:
 
 def liveness(index: Path, st: JobState) -> str:
     """'alive' or 'stale'."""
-    if st.phase == "failed":
+    if st.phase in ("failed", "cancelled"):
         return "stale"
     if st.phase == "starting" and time.time() - st.started_at < STARTING_GRACE:
         return "alive" if st.pid <= 0 or pid_running(st.pid) else "stale"
@@ -301,7 +305,7 @@ def check(index: Path, clean: bool = True) -> tuple[JobState | None, JobState | 
         if liveness(index, st) == "alive":
             return st, None
         clear_state(index)
-    return None, st
+    return None, (None if st.phase == "cancelled" else st)  # a cancelled job was not lost
 
 
 def covers(st: JobState, scope: list[str]) -> bool:
@@ -402,7 +406,7 @@ def worker_argv(
 
 @dataclass
 class Request:
-    result: str  # started, attached, queued, busy
+    result: str  # started, attached, queued, busy, cancelled (stopped while starting)
     state: JobState | None = None  # the job (for queued: the one it waits for)
     stale: JobState | None = None  # a dead job cleaned up on the way
 
@@ -416,7 +420,7 @@ def request(index: Path, paths: list[str], threads: int, options: list[str]) -> 
         st = read_state(index)
         if st is not None and liveness(index, st) == "stale":
             clear_state(index)
-            stale, st = st, None
+            stale, st = (None if st.phase == "cancelled" else st), None
         if st is not None:
             if covers(st, paths):
                 return Request("attached", st, stale)
@@ -445,11 +449,32 @@ def request(index: Path, paths: list[str], threads: int, options: list[str]) -> 
         raise
     with job_mutex(index):
         cur = read_state(index)
-        if cur is not None and cur.pid <= 0 and cur.job_id == st.job_id:
+        if cur is not None and cur.job_id == st.job_id and cur.phase == "cancelled":
+            # `index --stop` while this was starting. The worker exits when
+            # it sees this (or no state); end it now if it is still the
+            # child just started.
+            _end_child(pid)
+            clear_state(index)
+            return Request("cancelled", st, stale)
+        # (No state, or another job's: this worker finished already, or its
+        # job was cleaned up; a worker never takes over a state not its own.)
+        if cur is not None and cur.job_id == st.job_id and cur.pid <= 0:
             cur.pid, cur.pid_start = pid, process_start(pid) or ""
             write_state(index, cur)
     st.pid = pid
     return Request("started", st, stale)
+
+
+def _end_child(pid: int) -> None:
+    """Kill a worker this process started and has not reaped (so its PID
+    cannot belong to another process yet)."""
+    child = _children.get(pid)
+    if child is None or child.poll() is not None:
+        return
+    with contextlib.suppress(OSError):
+        child.kill()
+    with contextlib.suppress(subprocess.SubprocessError):
+        child.wait(KILL_WAIT)
 
 
 # ---------------------------------------------------------------- stop
@@ -507,6 +532,19 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
             break
         time.sleep(0.2)
     cur = read_state(index)
+    if cur is not None and liveness(index, cur) == "alive" and cur.pid <= 0:
+        # Still starting: no worker has written its PID yet (the spawn may
+        # be slow). Mark the job cancelled, keeping the stop file: its worker
+        # checks the state is its own and not cancelled before it takes the
+        # index and at every update, and request() ends it once the spawn
+        # returns.
+        with job_mutex(index):
+            cur = read_state(index)
+            if cur is not None and cur.job_id == st.job_id and cur.pid <= 0:
+                cur.phase = "cancelled"
+                write_state(index, cur)
+                return StopResult("stopped", cur)
+        cur = read_state(index)
     if cur is not None and liveness(index, cur) == "alive" and cur.pid > 0:
         # Kill only the worker of this job: never a process that merely has
         # its PID now, nor one whose start time cannot be checked.
@@ -559,12 +597,25 @@ class _Worker:
         self.rep = None  # the IndexReport of an interrupted run
         self.rate_start: tuple[float, float] | None = None  # (cost, seconds) when images began
         self.budget = 140  # image token budget of the run (set by cli._index_locked)
+        self.gone = False  # the state is not this job's any more
+
+    def owns(self, st: JobState | None) -> bool:
+        """Whether `st` is this worker's job, not cancelled. A worker started
+        without a job_id (by hand) takes whatever state there is."""
+        if not self.job_id:
+            return True
+        return st is not None and st.job_id == self.job_id and st.phase != "cancelled"
 
     def update(self, **fields) -> None:
+        """Save progress into the job's state; raises KeyboardInterrupt
+        (and sets self.gone) when the state is no longer this job's: it was
+        stopped while starting, maybe with a newer job started since."""
         with job_mutex(self.index):
-            st = read_state(self.index) or JobState(
-                started_at=time.time(), log=str(job_paths(self.index).log)
-            )
+            st = read_state(self.index)
+            if not self.owns(st):
+                self.gone = True
+                raise KeyboardInterrupt
+            st = st or JobState(started_at=time.time(), log=str(job_paths(self.index).log))
             st.pid, st.pid_start = os.getpid(), self.pid_start
             st.job_id = st.job_id or self.job_id
             for k, v in fields.items():
@@ -573,7 +624,7 @@ class _Worker:
         self.last_write = time.monotonic()
 
     def should_stop(self) -> bool:
-        return self.stop_path.exists()
+        return self.gone or self.stop_path.exists()
 
     def on_plan(self, todo: list) -> list:
         from .indexer import estimate_cost
@@ -624,6 +675,10 @@ def run_worker(args) -> int:
     w = _Worker(index, args.job_id or "")
     print(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} background index, PID {os.getpid()}")
     sys.stdout.flush()
+    with job_mutex(index):
+        if not w.owns(read_state(index)):
+            print("The job was stopped before it started.", file=sys.stderr)
+            return cli.EXIT_INTERRUPTED
     store = None
     try:
         store = Store(index, create=True)
@@ -659,11 +714,12 @@ def run_worker(args) -> int:
                 raise KeyboardInterrupt
             with job_mutex(index):
                 st = read_state(index)
-                if st is not None and st.queue:
+                if w.owns(st) and st is not None and st.queue:
                     item = st.queue.pop(0)
                     write_state(index, st)
                     continue
-                clear_state(index)
+                if w.owns(st):
+                    clear_state(index)
                 store.close()  # releases the writer lock while the mutex is held
                 store = None
             return 0
@@ -674,7 +730,8 @@ def run_worker(args) -> int:
                 update_throughput(store, r.embedded_cost, r.embed_seconds, BG_CALIB_KEY)
         with job_mutex(index):
             st = read_state(index)
-            if st is not None and w.should_stop():
+            mine = w.owns(st)  # else leave the state and stop file of another job alone
+            if mine and st is not None and w.should_stop():
                 # For `index --stop`, which reports the files done: exact
                 # counts, not the last saved progress.
                 if r is not None:
@@ -682,7 +739,8 @@ def run_worker(args) -> int:
                 with contextlib.suppress(OSError):
                     _create_private(job_paths(index).final)
                     job_paths(index).final.write_text(st.to_json(), encoding="utf-8")
-            clear_state(index)
+            if mine:
+                clear_state(index)
             if store is not None:
                 store.close()
                 store = None
@@ -691,7 +749,7 @@ def run_worker(args) -> int:
     except BaseException as e:
         traceback.print_exc()
         msg = str(e) if not isinstance(e, cli._Exit) else "see the log"
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception, KeyboardInterrupt):  # not if it is not our job
             w.update(phase="failed", error=(msg or type(e).__name__)[:200])
         return cli.EXIT_ERROR
     finally:

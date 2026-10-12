@@ -494,7 +494,7 @@ def _kinds(value: str | Iterable[str] | None) -> list[str] | None:
     if isinstance(value, str):
         kinds = {v.strip().lower() for v in value.split(",") if v.strip()}
     else:
-        kinds = set(value)
+        kinds = {str(v).strip().lower() for v in value}
     bad = kinds - set(KINDS)
     if bad or not kinds:
         raise ValueError(

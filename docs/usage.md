@@ -238,9 +238,11 @@ PowerShell and cmd decode it with; set `[Console]::OutputEncoding = [Text.Encodi
 | 2 | an error, including a missing PATH or nothing indexed under the PATH |
 | 130 | interrupted (Ctrl-C) |
 
-Other commands exit with 0 or 2 (130 when interrupted). `anygrep index` exits with 2 when a file
-failed to index (a broken image or PDF, say), after indexing the rest; skipped files (too small, no
-text layer) do not count. `anygrep status --problems` lists them.
+Other commands exit with 0 or 2 (130 when interrupted). `anygrep index` exits with 2 while a file
+under its PATHs has failed to index (a broken image or PDF, say), after indexing the rest. A broken
+file is tried again only when it changes, but it counts on every run until then (the summary says
+"N still failed from an earlier run"). Skipped files (too small, no text layer) do not count.
+`anygrep status --problems` lists both.
 
 ### Weak results
 

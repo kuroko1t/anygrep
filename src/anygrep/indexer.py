@@ -123,6 +123,8 @@ class IndexReport:
     embed_seconds: float = 0.0
     skipped: int = 0
     errors: int = 0
+    # Files that failed in an earlier run and were not tried again (unchanged).
+    still_failed: int = 0
     deferred_images: int = 0
     seconds: float = 0.0
     interrupted: bool = False
@@ -253,6 +255,7 @@ def plan(
             continue
         if row.size == e.size and row.mtime_ns == e.mtime_ns:
             report.unchanged += 1
+            report.still_failed += row.status == "error"
             continue
         if row.size == e.size and row.sha256:
             try:
@@ -262,6 +265,7 @@ def plan(
             if same:
                 touched.append((row.id, e.size, e.mtime_ns))
                 report.unchanged += 1
+                report.still_failed += row.status == "error"
                 continue
         todo.append((e, False))
     # One transaction for all of them: after a checkout or a sync that touched
