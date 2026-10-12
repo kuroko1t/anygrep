@@ -6,6 +6,25 @@ All notable changes to anygrep are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `anygrep index` exits with status 2 when a file failed to index (it still indexes the rest and
+  prints the summary). Skipped files do not count. Before, it exited with 0.
+
+### Fixed
+
+- `index --stop` no longer kills a process that only reuses the PID of a background job that died: the
+  job records its process start time and is killed only when it matches. When that cannot be checked,
+  `--stop` fails instead of killing.
+- `index --stop` right after `index --background` (before the index file exists) stops the job
+  instead of saying none is running.
+- Python API: calling the same `Index` from the `progress` callback of `update()` raises `RuntimeError`.
+  A search from there could record images at the wrong token budget, and an update from there released
+  the writer lock early.
+- Python API: `k`, `threads` and `image_tokens` must be whole numbers (`image_tokens=70.0` was stored
+  as `"70.0"` and broke later searches); `type` takes a comma list like `-t`; a PIL `image` gets its
+  EXIF orientation applied like a file; searching an empty index no longer loads the model.
+
 ## [0.1.0] - 2026-10-12
 
 First public release.

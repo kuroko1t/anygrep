@@ -376,3 +376,87 @@ def test_image_tokens_and_extensions(idx: anygrep.Index, corpus: Path, cutoff) -
     r = idx.update(corpus, images=False)
     assert (r.unchanged, r.removed) == (4, 0)  # .py is remembered; images stay indexed
     assert len(idx.search("red picture", type="image", weak=True)) == 2
+
+
+def test_progress_callback_may_not_reenter(idx: anygrep.Index, corpus: Path, env, tmp_path) -> None:
+    # A search from progress changed the embedder's image budget mid-run, so
+    # images were embedded at one budget and recorded at another; an update
+    # from progress released the writer lock the outer update still needed.
+    (corpus / "more").mkdir()
+    for i in range(3):
+        Image.new("RGB", (64, 64), (10, 10 + 60 * i, 200)).save(corpus / "more" / f"b{i}.png")
+    seen: list[tuple[int, int, bool]] = []
+    errors: list[str] = []
+
+    def progress(done: int, total: int) -> None:
+        for call in (lambda: idx.search("bread"), lambda: idx.update(corpus), idx.close):
+            with pytest.raises(RuntimeError, match="progress callback") as e:
+                call()
+            errors.append(str(e.value))
+        lock = acquire_writer_lock(tmp_path / "api.sqlite")
+        seen.append((done, env.image_budget, lock is None))
+        if lock is not None:
+            lock.close()
+
+    idx.update(corpus, image_tokens=70, progress=progress)
+    assert len(errors) == 3 * len(seen) and seen
+    assert all(held for _, _, held in seen)
+    assert all(budget == 70 for done, budget, _ in seen if done)
+    assert idx.update(corpus).unchanged == 8  # usable again afterwards
+    assert idx.search("sourdough bread", weak=True)
+
+
+def test_search_keeps_the_embedder_budget(idx: anygrep.Index, corpus: Path, env) -> None:
+    idx.update(corpus, image_tokens=70)
+    env.image_budget = 280
+    idx.search("sourdough bread")
+    assert env.image_budget == 280
+
+
+def test_whole_numbers_only(idx: anygrep.Index, corpus: Path, tmp_path: Path) -> None:
+    # image_tokens=70.0 was stored as "70.0" and broke every later search.
+    for bad in (
+        lambda: idx.update(corpus, image_tokens=70.0),
+        lambda: idx.update(corpus, image_tokens=True),
+        lambda: idx.search("a", k=2.5),
+        lambda: idx.search("a", k=True),
+        lambda: anygrep.Index(tmp_path / "x.sqlite", threads=2.5),
+    ):
+        with pytest.raises(TypeError, match="whole number"):
+            bad()
+    assert idx.update(corpus, image_tokens=70).new == 5
+    assert idx.search("sourdough bread", k=3, weak=True)
+
+
+def test_type_takes_a_comma_list(idx: anygrep.Index, corpus: Path, cutoff) -> None:
+    idx.update(corpus)
+    hits = idx.search("reset the wifi password", type="pdf,image")
+    assert [Path(h.path).name for h in hits] == ["manual.pdf"]
+    assert idx.search("reset the wifi password", type="text, image") == []
+    with pytest.raises(ValueError, match=r'\["pdf", "image"\]'):
+        idx.search("a", type="pdf;image")
+
+
+def test_pil_image_query_is_turned_like_a_file(
+    idx: anygrep.Index, corpus: Path, tmp_path: Path, env, monkeypatch
+) -> None:
+    idx.update(corpus)
+    photo = tmp_path / "photo.jpg"
+    exif = Image.Exif()
+    exif[0x0112] = 6  # Orientation: turn 90 degrees
+    Image.new("RGB", (80, 40), (230, 10, 10)).save(photo, exif=exif)
+    sizes = []
+    real = env.embed_image
+    monkeypatch.setattr(env, "embed_image", lambda im: sizes.append(im.size) or real(im))
+    idx.search(image=photo, weak=True)
+    with Image.open(photo) as im:
+        idx.search(image=im, weak=True)
+        assert im.size == (80, 40)  # the caller's image is not changed
+    assert sizes == [(40, 80), (40, 80)]
+
+
+def test_empty_index_does_not_load_the_model(tmp_path: Path, loads, corpus: Path) -> None:
+    with anygrep.Index(tmp_path / "empty.sqlite") as idx:
+        assert idx.search("hello") == []
+        assert idx.search(image=corpus / "red.png") == []
+        assert loads == []

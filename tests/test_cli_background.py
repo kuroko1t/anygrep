@@ -254,3 +254,21 @@ def test_index_background_all_roots_and_threads(env, notes: Path, capsys) -> Non
     st = Store(db_path(), create=False)
     assert st.counts()["text"]["ok"] == 3
     st.close()
+
+
+def test_stop_a_job_that_has_not_created_the_index_yet(
+    env, tmp_path: Path, capsys, monkeypatch
+) -> None:
+    # The worker is still importing: the state file exists, the index not yet.
+    db_path().parent.mkdir(parents=True, exist_ok=True)
+    st = job.JobState(job_id="a" * 32, pid=os.getpid(), started_at=time.time(),
+                      scope=[str(tmp_path)], log=str(job.job_paths(db_path()).log))  # fmt: skip
+    job.write_state(db_path(), st)
+    assert not db_path().exists()
+    stops = []
+    monkeypatch.setattr(
+        job, "stop", lambda index: stops.append(index) or job.StopResult("stopped", st)
+    )
+    code, out, err = run(capsys, "index", "--stop")
+    assert code == 0 and stops == [db_path()]
+    assert "stopping the background index" in err and out.startswith("Stopped the background")

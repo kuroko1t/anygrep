@@ -35,7 +35,8 @@ anygrep -Q ~/notes                            # interactive: the model stays loa
 anygrep index --background ~/Pictures         # big folder: index in a low-priority process
 ```
 
-Queries and documents can be in different languages. Weak matches are hidden (`--weak` shows them) and
+Results are the 10 closest files by meaning (`-m N` for more), not every match; queries are not regular
+expressions. Queries and documents can be in different languages. Weak matches are hidden (`--weak` shows them) and
 near-duplicate files are shown once. See `anygrep -h` and [docs/usage.md](docs/usage.md).
 
 The first search in a big folder is slow because it indexes the new files first, with a progress bar on

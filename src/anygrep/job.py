@@ -13,7 +13,9 @@ indexed so far. Its state lives in a JSON file next to the index:
 
 A job counts as alive only while its process runs and the writer lock is
 held, so a reused PID or a foreground `anygrep index` holding the lock is
-not mistaken for it. A dead job is reported once and cleaned up; it is never
+not mistaken for it. The state records the worker's process start time too:
+a process with the same PID but another start time is not the worker, and
+`index --stop` kills a worker only when its start time matches. A dead job is reported once and cleaned up; it is never
 restarted on its own (`anygrep index --background PATH` resumes it).
 """
 
@@ -28,6 +30,7 @@ import subprocess
 import sys
 import time
 import traceback
+import uuid
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -62,6 +65,11 @@ WORKER_PREFIX = [sys.executable, "-m", "anygrep"]
 class JobState:
     version: int = STATE_VERSION
     pid: int = 0
+    # The process start time of `pid` (process_start), so a reused PID is
+    # not taken for the worker; "" when unknown.
+    pid_start: str = ""
+    # Set when the job is requested; the worker gets it as --job-id.
+    job_id: str = ""
     started_at: float = 0.0
     updated_at: float = 0.0
     threads: int = 1
@@ -212,6 +220,53 @@ def _win_pid_running(pid: int) -> bool:
         kernel32.CloseHandle(h)
 
 
+def process_start(pid: int) -> str | None:
+    """When process `pid` started, as an opaque string that differs for a
+    later process with the same PID; None when it cannot be found out."""
+    if pid <= 0:
+        return None
+    try:
+        if sys.platform == "win32":
+            return _win_process_start(pid)
+        if sys.platform.startswith("linux"):
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            ticks = stat.rsplit(")", 1)[1].split()[19]  # field 22, starttime
+            boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            return f"{boot}:{ticks}"
+        out = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+            timeout=5, env={**os.environ, "LC_ALL": "C"},
+        )  # fmt: skip
+        return out.stdout.strip() or None
+    except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _win_process_start(pid: int) -> str | None:
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    h = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return None
+    try:
+        times = [ctypes.c_ulonglong() for _ in range(4)]
+        if not kernel32.GetProcessTimes(h, *(ctypes.byref(t) for t in times)):
+            return None
+        return str(times[0].value)  # creation time
+    finally:
+        kernel32.CloseHandle(h)
+
+
+def same_process(st: JobState) -> bool | None:
+    """Whether st.pid is still the process the state recorded: None when
+    that cannot be checked (no start time recorded or readable)."""
+    if not st.pid_start:
+        return None
+    now = process_start(st.pid)
+    return None if now is None else now == st.pid_start
+
+
 def lock_held(index: Path) -> bool:
     lock = acquire_writer_lock(index)
     if lock is None:
@@ -226,7 +281,9 @@ def liveness(index: Path, st: JobState) -> str:
         return "stale"
     if st.phase == "starting" and time.time() - st.started_at < STARTING_GRACE:
         return "alive" if st.pid <= 0 or pid_running(st.pid) else "stale"
-    return "alive" if pid_running(st.pid) and lock_held(index) else "stale"
+    if not pid_running(st.pid) or same_process(st) is False:
+        return "stale"
+    return "alive" if lock_held(index) else "stale"
 
 
 def check(index: Path, clean: bool = True) -> tuple[JobState | None, JobState | None]:
@@ -334,10 +391,12 @@ def spawn(argv: list[str], log_path: Path, cwd: Path) -> int:
     return p.pid
 
 
-def worker_argv(index: Path, paths: list[str], threads: int, options: list[str]) -> list[str]:
+def worker_argv(
+    index: Path, paths: list[str], threads: int, options: list[str], job_id: str
+) -> list[str]:
     return [
-        *WORKER_PREFIX, "index", "--run-job", "--db", str(index), "-j", str(threads),
-        *options, "--", *paths,
+        *WORKER_PREFIX, "index", "--run-job", "--job-id", job_id, "--db", str(index),
+        "-j", str(threads), *options, "--", *paths,
     ]  # fmt: skip
 
 
@@ -368,22 +427,26 @@ def request(index: Path, paths: list[str], threads: int, options: list[str]) -> 
         if lock_held(index):
             return Request("busy", None, stale)
         jp = job_paths(index)
-        st = JobState(started_at=time.time(), threads=threads, scope=paths, log=str(jp.log))
+        st = JobState(
+            job_id=uuid.uuid4().hex, started_at=time.time(), threads=threads, scope=paths,
+            log=str(jp.log),
+        )  # fmt: skip
         for old in (jp.stop, jp.final):
             with contextlib.suppress(FileNotFoundError):
                 old.unlink()
         write_state(index, st)
     # Spawned outside the mutex, so the worker can take it at once.
     try:
-        pid = spawn(worker_argv(index, paths, threads, options), job_paths(index).log, index.parent)
+        argv = worker_argv(index, paths, threads, options, st.job_id)
+        pid = spawn(argv, job_paths(index).log, index.parent)
     except OSError:
         with job_mutex(index):
             clear_state(index)
         raise
     with job_mutex(index):
         cur = read_state(index)
-        if cur is not None and cur.pid <= 0:
-            cur.pid = pid
+        if cur is not None and cur.pid <= 0 and cur.job_id == st.job_id:
+            cur.pid, cur.pid_start = pid, process_start(pid) or ""
             write_state(index, cur)
     st.pid = pid
     return Request("started", st, stale)
@@ -445,6 +508,10 @@ def stop(index: Path, timeout: float = STOP_WAIT) -> StopResult:
         time.sleep(0.2)
     cur = read_state(index)
     if cur is not None and liveness(index, cur) == "alive" and cur.pid > 0:
+        # Kill only the worker of this job: never a process that merely has
+        # its PID now, nor one whose start time cannot be checked.
+        if cur.job_id != st.job_id or same_process(cur) is not True:
+            return StopResult("failed", cur)
         try:
             _kill(cur.pid)
         except ProcessLookupError:
@@ -479,8 +546,10 @@ def _detach_setup() -> None:
 class _Worker:
     """The hooks run_index calls: progress into the state file, stop requests."""
 
-    def __init__(self, index: Path) -> None:
+    def __init__(self, index: Path, job_id: str = "") -> None:
         self.index = index
+        self.job_id = job_id
+        self.pid_start = process_start(os.getpid()) or ""
         self.stop_path = job_paths(index).stop
         self.last_write = 0.0
         self.phase = "planning"
@@ -496,7 +565,8 @@ class _Worker:
             st = read_state(self.index) or JobState(
                 started_at=time.time(), log=str(job_paths(self.index).log)
             )
-            st.pid = os.getpid()
+            st.pid, st.pid_start = os.getpid(), self.pid_start
+            st.job_id = st.job_id or self.job_id
             for k, v in fields.items():
                 setattr(st, k, v)
             write_state(self.index, st)
@@ -551,7 +621,7 @@ def run_worker(args) -> int:
 
     index = Path(os.path.abspath(cli._index_path(args)))
     _detach_setup()
-    w = _Worker(index)
+    w = _Worker(index, args.job_id or "")
     print(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} background index, PID {os.getpid()}")
     sys.stdout.flush()
     store = None

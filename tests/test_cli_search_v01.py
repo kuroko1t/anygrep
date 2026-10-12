@@ -983,3 +983,15 @@ def test_global_option_before_status_runs_status(env, tmp_path: Path, notes, cap
     index(capsys, notes)
     code, out, _ = run(capsys, "-j", "2", "status")
     assert code == 0 and "Index:" in out and "Threads: 2" in out
+
+
+def test_index_exits_2_when_a_file_failed(env, corpus: Path, capsys) -> None:
+    (corpus / "broken.png").write_bytes(b"\x89PNG not really")
+    code, out, err = run(capsys, "index", "-q", str(corpus))
+    assert code == 2 and out == "" and err == ""
+    code, _, err = run(capsys, "index", str(corpus))  # not retried: nothing failed now
+    assert code == 0 and "failed" not in err
+    (corpus / "notes" / "more.md").write_text("# More\n\nAnother note.\n", encoding="utf-8")
+    (corpus / "broken2.png").write_bytes(b"\x89PNG not really")
+    code, _, err = run(capsys, "index", str(corpus))
+    assert code == 2 and "1 new" in err and "1 failed" in err  # the summary still prints

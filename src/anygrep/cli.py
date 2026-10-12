@@ -414,7 +414,7 @@ def _index_summary(args, rep) -> int:
     if rep.interrupted:
         _err("Interrupted. Finished files are saved; run the same command again to resume.")
         return EXIT_INTERRUPTED
-    return 0
+    return EXIT_ERROR if rep.errors else 0
 
 
 # ---------------------------------------------------------------- background
@@ -589,10 +589,13 @@ def _index_stop(args) -> int:
     if args.no_images or args.max_size:
         raise _fail("anygrep: --stop takes no PATH and no other index options")
     index = _job_index(args)
-    if index.exists() and job.check(index, clean=False)[0] is not None:
+    # A job just started has a state file but may not have created the
+    # index yet.
+    has_job = job.job_paths(index).state.exists()
+    if has_job and job.check(index, clean=False)[0] is not None:
         # The worker stops after the model run in progress: say so at once.
         _err("anygrep: stopping the background index...")
-    r = job.stop(index) if index.exists() else job.StopResult("none")
+    r = job.stop(index) if has_job else job.StopResult("none")
     if r.stale is not None:
         _stale_message(r.stale)
     if r.result == "none":
@@ -1609,6 +1612,7 @@ def build_parsers() -> dict[str, argparse.ArgumentParser]:
     )
     pi.add_argument("--stop", action="store_true", help="stop the background index")
     pi.add_argument("--run-job", action="store_true", help=argparse.SUPPRESS)
+    pi.add_argument("--job-id", help=argparse.SUPPRESS)
     pi.set_defaults(func=cmd_index)
 
     pst = sub("status", "Show index and model information.")

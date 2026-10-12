@@ -107,11 +107,13 @@ def test_request_rows(tmp_path: Path, fake_spawn) -> None:
     r = job.request(index, [a], 2, ["--no-images"])
     assert r.result == "started" and r.state.pid == 999_999_999
     argv = fake_spawn[0]
-    assert argv[len(job.WORKER_PREFIX) :] == [
-        "index", "--run-job", "--db", str(index), "-j", "2", "--no-images", "--", a,
-    ]  # fmt: skip
     st = job.read_state(index)
+    assert argv[len(job.WORKER_PREFIX) :] == [
+        "index", "--run-job", "--job-id", st.job_id, "--db", str(index), "-j", "2",
+        "--no-images", "--", a,
+    ]  # fmt: skip
     assert st.phase == "starting" and st.pid == 999_999_999 and st.scope == [a]
+    assert len(st.job_id) == 32
     # A running job (this process holds the lock and is the PID).
     st.pid, st.phase = os.getpid(), "images"
     job.write_state(index, st)
@@ -405,3 +407,71 @@ def test_request_stop_creates_the_file_on_every_platform(tmp_path: Path, monkeyp
     job.request_stop(index)
     assert job.job_paths(index).stop.exists()
     assert job._Worker(index).should_stop()
+
+
+# 11 --------------------------------------------------------------- stop: whose PID
+def test_process_start_tells_processes_apart() -> None:
+    me = job.process_start(os.getpid())
+    if me is None:
+        pytest.skip("process start times are not available here")
+    assert job.process_start(os.getpid()) == me
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+    try:
+        assert job.process_start(other.pid) not in (None, me)
+    finally:
+        other.kill()
+        other.wait()
+    st = job.JobState(pid=os.getpid(), pid_start=me)
+    assert job.same_process(st) is True
+    st.pid_start = "another process"
+    assert job.same_process(st) is False
+    st.pid_start = ""
+    assert job.same_process(st) is None
+
+
+@pytest.fixture
+def reused_pid(tmp_path: Path, monkeypatch):
+    """A job state whose PID 4242 now belongs to another, running process
+    (the worker died hard and the PID was reused), while something else
+    holds the writer lock. Kills are recorded, never sent."""
+    index = tmp_path / "index.sqlite"
+    st = job.JobState(job_id="a" * 32, pid=4242, pid_start="worker", phase="text",
+                      started_at=time.time() - 100, scope=[str(tmp_path)])  # fmt: skip
+    job.write_state(index, st)
+    starts = {4242: "another process"}
+    killed: list[int] = []
+    monkeypatch.setattr(job, "pid_running", lambda pid: pid == 4242)
+    monkeypatch.setattr(job, "process_start", lambda pid: starts.get(pid))
+    monkeypatch.setattr(job, "_kill", killed.append)
+    lock = acquire_writer_lock(index)
+    yield index, starts, killed
+    lock.close()
+
+
+def test_stop_never_kills_a_reused_pid(reused_pid) -> None:
+    index, _, killed = reused_pid
+    r = job.stop(index, timeout=0.5)
+    assert killed == []
+    assert r.result == "none" and r.stale is not None and r.stale.pid == 4242
+    assert not job.job_paths(index).state.exists()
+
+
+def test_stop_does_not_kill_when_ownership_is_unknown(reused_pid) -> None:
+    index, starts, killed = reused_pid
+    del starts[4242]  # the start time cannot be read
+    r = job.stop(index, timeout=0.5)
+    assert killed == [] and r.result == "failed"
+    st = job.read_state(index)  # recorded without a start time (older state)
+    st.pid_start = ""
+    job.write_state(index, st)
+    starts[4242] = "worker"
+    assert job.stop(index, timeout=0.5).result == "failed" and killed == []
+
+
+def test_stop_kills_its_own_worker(reused_pid, monkeypatch) -> None:
+    index, starts, killed = reused_pid
+    starts[4242] = "worker"
+    monkeypatch.setattr(job, "pid_running", lambda pid: pid == 4242 and not killed)
+    r = job.stop(index, timeout=0.5)
+    assert killed == [4242] and r.result == "stopped"
+    assert not job.job_paths(index).state.exists()

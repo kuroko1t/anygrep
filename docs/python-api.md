@@ -59,7 +59,8 @@ is skipped and keeps its entries.
 - `extensions`: also index these extensions as plain text, for example `[".py", ".json"]`. They are
   remembered for later runs, as with `--ext`.
 - `progress`: called as `progress(done, total)` with the number of files finished and to do, first
-  with `done == 0`. It may be called more than once with the same numbers.
+  with `done == 0`. It may be called more than once with the same numbers. It may not call the same
+  `Index` (`search()`, `update()` or `close()` from it raise `RuntimeError`).
 
 Returns an `UpdateResult` with the counts of files `new`, `updated`, `unchanged`, `removed`, `moved`,
 `skipped` and `failed`, and `seconds`. `anygrep status --problems` lists the skipped and failed files.
@@ -78,7 +79,8 @@ nothing is downloaded.
 ## `Index.search(query=None, *, image=None, k=10, paths=None, glob=None, type=None, weak=False, collapse=True, chunks=False)`
 
 Searches by meaning and returns a list of `Hit`, best first. Give either a text `query` or `image`, a
-file path or a PIL image. When `image` is a file in the index, that file is left out of the results.
+file path or a PIL image (its EXIF orientation is applied, as for a file; the image itself is not
+changed). When `image` is a file in the index, that file is left out of the results.
 
 - `k`: the most results to return (`-m`). There are often fewer, because weak matches are left out.
 - `paths`: search only under these folders or files. The default (`None`) is the whole index; the
@@ -86,7 +88,8 @@ file path or a PIL image. When `image` is a file in the index, that file is left
   searching everything.
 - `glob`: one pattern or a list, as with `-g`: `"*.md"`, `"notes/*"`, `"!archive/*"` to exclude. An
   empty list raises `ValueError`.
-- `type`: `"text"`, `"pdf"`, `"image"` or a list of them, as with `-t`.
+- `type`: `"text"`, `"pdf"`, `"image"`, a list of them, or a comma list such as `"pdf,image"`, as with
+  `-t`.
 - `weak=True`: also return results below the relevance cutoff, marked with `Hit.weak`
   ([relevance.md](relevance.md)).
 - `collapse=False`: list near-duplicate files separately instead of under the best one
@@ -96,7 +99,8 @@ file path or a PIL image. When `image` is a file in the index, that file is left
 
 `search()` only reads the index; unlike the command it does not index new files first. Call `update()`
 for that. When nothing passes the cutoff the list is empty, and so it is for a new or empty index; the
-command's "closest results" fallback is `search(..., weak=True, k=3)`.
+command's "closest results" fallback is `search(..., weak=True, k=3)`. On an index with nothing in
+it (or nothing under `paths`) the model is not loaded.
 
 The results are the ones `anygrep --json --everywhere` prints for the same options, with the same
 order, `weak` flags and grouping. Two things differ in form: `--json` rounds `score` to 4 decimals,
@@ -133,7 +137,8 @@ All errors anygrep raises on purpose derive from `anygrep.AnygrepError`:
 - `ModelLoadError`: the model files are there but the installed onnxruntime or tokenizers cannot load
   them.
 
-Wrong arguments, including an invalid `$ANYGREP_THREADS`, raise `ValueError`, and paths that do not exist raise `FileNotFoundError`. An image
+Wrong arguments, including an invalid `$ANYGREP_THREADS`, raise `ValueError` (`TypeError` when `k`,
+`threads` or `image_tokens` is not a whole number), and paths that do not exist raise `FileNotFoundError`. An image
 that cannot be read raises what Pillow raises (an `OSError`), or `ValueError` when it is too small or too large.
 
 `anygrep.__version__` is the installed version.

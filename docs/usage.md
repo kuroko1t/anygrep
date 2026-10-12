@@ -99,7 +99,9 @@ started while another one runs exits with status 2, and a search searches the in
 - Searches meanwhile search what is indexed so far and end with that progress line.
 - `anygrep index --background OTHER` while a job runs adds `OTHER` to it (it is indexed next).
 - `anygrep index --stop` stops it; the next `anygrep index --background PATH` (or `anygrep index`)
-  continues. While a job runs, `index`, `remove` and `reset` exit with status 2.
+  continues. A job that does not stop within 30 seconds is killed, but only when its process is
+  still the job's (same PID and start time); otherwise `--stop` fails with status 2. While a job
+  runs, `index`, `remove` and `reset` exit with status 2.
 - A job whose process died (killed, machine restarted) is reported once by the next command, with the
   command that resumes it. Under WSL, closing the last WSL window can shut the Linux VM down after a
   while, which stops the job the same way.
@@ -236,7 +238,9 @@ PowerShell and cmd decode it with; set `[Console]::OutputEncoding = [Text.Encodi
 | 2 | an error, including a missing PATH or nothing indexed under the PATH |
 | 130 | interrupted (Ctrl-C) |
 
-Other commands exit with 0 or 2 (130 when interrupted).
+Other commands exit with 0 or 2 (130 when interrupted). `anygrep index` exits with 2 when a file
+failed to index (a broken image or PDF, say), after indexing the rest; skipped files (too small, no
+text layer) do not count. `anygrep status --problems` lists them.
 
 ### Weak results
 

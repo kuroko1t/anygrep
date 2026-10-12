@@ -17,6 +17,7 @@ needs it.
 from __future__ import annotations
 
 import functools
+import numbers
 import os
 import sqlite3
 import threading
@@ -118,8 +119,10 @@ class Index:
                 raise ValueError(
                     f"ANYGREP_THREADS must be a whole number of at least 1, got {value!r}"
                 ) from None
-        elif threads < 1:
-            raise ValueError("threads must be at least 1")
+        else:
+            threads = _whole(threads, "threads")
+            if threads < 1:
+                raise ValueError("threads must be at least 1")
         if path is None:
             self.path = default_index_path().resolve()
         elif not os.fspath(path):
@@ -129,6 +132,7 @@ class Index:
         self.threads = threads
         self.create = create
         self._mutex = threading.RLock()
+        self._updating = False  # update() runs: its progress callback may not re-enter
         self._load: Callable[[bool], Embedder] | None = None
         self._store: Store | None = None
         self._store, self._file = self._open()
@@ -156,6 +160,7 @@ class Index:
     def close(self) -> None:
         """Close the index file and drop the model. Calling it again does
         nothing."""
+        self._not_from_progress()
         store, self._store = self._store, None
         self._load = None
         if store is not None:
@@ -182,6 +187,12 @@ class Index:
             old, self._store = self._store, store
             old.close()
         return self._store
+
+    def _not_from_progress(self) -> None:
+        # Only the thread running update() gets past the lock while it runs:
+        # a call from its progress callback.
+        if self._updating:
+            raise RuntimeError("cannot use this Index from its progress callback")
 
     def _embedder(self, vision: bool) -> Embedder:
         if self._load is None:
@@ -218,23 +229,29 @@ class Index:
 
         `paths` limits the search to these folders or files (default: the
         whole index). `glob` patterns work like `-g` ("*.md", "!drafts/*")
-        and `type` like `-t` ("text", "pdf", "image"). Near-duplicate files
+        and `type` like `-t` ("text", "pdf", "image", "pdf,image"). An
+        `image` given as a PIL image is turned by its EXIF orientation, as a
+        file is. Near-duplicate files
         are grouped under the best one (Hit.similar) unless `collapse` is
         false. With `chunks`, a file can appear more than once.
 
         Only what is indexed is searched: call update() first to pick up new
         or changed files.
         """
-        from .embedder import load_image, to_rgb
+        from PIL import ImageOps
+
+        from .embedder import _downscale, load_image, to_rgb
         from .paths import canonical, search_scope
         from .search import clean_text, image_query, query_budget, scope_matcher, search
 
+        self._not_from_progress()
         if query is None and image is None:
             raise ValueError("give a text query or image=")
         if query is not None and image is not None:
             raise ValueError("give either a text query or image=, not both")
         if query is not None and not clean_text(query).strip():
             raise ValueError("the query is empty")
+        k = _whole(k, "k")
         if k < 1:
             raise ValueError("k must be at least 1")
         kinds = _kinds(type)
@@ -253,18 +270,24 @@ class Index:
             exclude = str(canonical(image))
             qimage = load_image(Path(image).expanduser())
         elif image is not None:
-            qimage = to_rgb(image)
+            small = _downscale(image)
+            qimage = to_rgb(ImageOps.exif_transpose(small) or small)  # a copy if turned
+        if not store.has_chunks() or (prefixes and not store.has_files_under(prefixes)):
+            return []  # nothing to search: no need for the model
         budget = query_budget(store)
         embedder = self._embedder(qimage is not None)
-        embedder.image_budget = budget
-        if qimage is not None:
-            qvec, image_queries = image_query(
-                store, embedder, qimage, budget, kinds, prefixes, scope, exclude
-            )
-            text = None
-        else:
-            text = clean_text(query or "")
-            qvec = embedder.embed_query(text)
+        old_budget, embedder.image_budget = embedder.image_budget, budget
+        try:
+            if qimage is not None:
+                qvec, image_queries = image_query(
+                    store, embedder, qimage, budget, kinds, prefixes, scope, exclude
+                )
+                text = None
+            else:
+                text = clean_text(query or "")
+                qvec = embedder.embed_query(text)
+        finally:
+            embedder.image_budget = old_budget
         hits = search(
             store,
             qvec,
@@ -301,7 +324,8 @@ class Index:
         re-embeds the images already indexed; by default the index keeps its
         budget (140 for a new one). `images=False` skips images in this run.
         `extensions` (".py", ".json") are also indexed as plain text from now
-        on. `progress(done, total)` is called as files finish.
+        on. `progress(done, total)` is called as files finish; it may not
+        call this Index (that raises RuntimeError).
 
         Finished files are saved as they go. If the run is interrupted
         (Ctrl-C, or an exception raised from `progress`), that exception is
@@ -312,7 +336,9 @@ class Index:
         index cannot be written, and FileNotFoundError for a path that does
         not exist.
         """
+        self._not_from_progress()
         try:
+            self._updating = True
             return self._update(paths, image_tokens, images, extensions, progress)
         except sqlite3.OperationalError as e:
             msg = str(e)
@@ -329,6 +355,8 @@ class Index:
             raise IndexAccessError(
                 f"cannot write the index at {self.path}: {e.strerror or e}"
             ) from None
+        finally:
+            self._updating = False
 
     def _update(
         self,
@@ -341,8 +369,10 @@ class Index:
         from . import job
         from .indexer import IndexOptions, index_settings, index_targets, update_index
 
-        if image_tokens is not None and image_tokens not in IMAGE_BUDGETS:
-            raise ValueError(f"image_tokens must be one of {IMAGE_BUDGETS}")
+        if image_tokens is not None:
+            image_tokens = _whole(image_tokens, "image_tokens")
+            if image_tokens not in IMAGE_BUDGETS:
+                raise ValueError(f"image_tokens must be one of {IMAGE_BUDGETS}")
         exts = [extensions] if isinstance(extensions, str) else list(extensions)
         targets = _path_list(paths, "update every indexed folder")
         _check_exist(targets)
@@ -460,11 +490,24 @@ def _kinds(value: str | Iterable[str] | None) -> list[str] | None:
     """The file types to search (None: all)."""
     if value is None:
         return None
-    kinds = {value} if isinstance(value, str) else set(value)
+    # "pdf,image" as with -t.
+    if isinstance(value, str):
+        kinds = {v.strip().lower() for v in value.split(",") if v.strip()}
+    else:
+        kinds = set(value)
     bad = kinds - set(KINDS)
     if bad or not kinds:
-        raise ValueError(f"type must be one or more of {', '.join(KINDS)}")
+        raise ValueError(
+            f'type must be one or more of {", ".join(KINDS)}, e.g. "pdf" or ["pdf", "image"]'
+        )
     return sorted(kinds) if kinds != set(KINDS) else None
+
+
+def _whole(value: object, name: str) -> int:
+    """`value` as an int: whole numbers only (not bool, not 2.0)."""
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(f"{name} must be a whole number, got {value!r}")
+    return int(value)
 
 
 def _public_hit(h: _StoreHit, query: str | None) -> Hit:

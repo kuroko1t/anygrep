@@ -375,7 +375,7 @@ def test_cli_named_ignored_folder_and_empty_run(env, tmp_path: Path, capsys) -> 
 
 def test_cli_status_model_reset_and_guards(env, corpus: Path, monkeypatch, capsys) -> None:
     (corpus / "broken.pdf").write_bytes(b"%PDF-1.4\n")
-    assert cli.main(["index", str(corpus), "-q"]) == 0
+    assert cli.main(["index", str(corpus), "-q"]) == cli.EXIT_ERROR  # broken.pdf failed
     capsys.readouterr()
     assert cli.main(["status", "--problems"]) == 0
     out = capsys.readouterr().out
