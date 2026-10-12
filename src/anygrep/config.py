@@ -79,6 +79,31 @@ CHUNK_TOKENS = 384
 CHUNK_OVERLAP = 48
 MAX_SEQ_TOKENS = 2048
 
+# Processing generation: raised by one whenever a change to anygrep makes it
+# turn some kind of file into different chunks or vectors with the same model
+# (text extraction, chunking, the document prompt, image preprocessing).
+# Each file row records the generation it was processed with, and the next
+# update processes again the files of the kinds a later generation changed
+# (GENERATION_CHANGES). It is separate from the schema version (the layout
+# of the index) and from the model revision (a different vector space, which
+# is never mixed into an index). Policy: docs/DESIGN.md.
+PROCESSING_GENERATION = 1
+# {generation: the file kinds it changed}. Generation 1 is everything before
+# generations were recorded; rows without one count as generation 1.
+GENERATION_CHANGES: dict[int, frozenset[str]] = {}
+
+
+def required_generation(kind: str) -> int:
+    """The oldest generation whose rows of this kind are still current."""
+    return max(
+        [1]
+        + [
+            g
+            for g, kinds in GENERATION_CHANGES.items()
+            if kind in kinds and g <= PROCESSING_GENERATION
+        ]
+    )
+
 
 def _env_path(name: str) -> Path | None:
     v = os.environ.get(name)

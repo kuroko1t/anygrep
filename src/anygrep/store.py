@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import config
 from .config import EMBED_DIM, MODEL_NAME, MODEL_REVISION
 from .errors import IndexMismatchError
 
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS files (
     status TEXT NOT NULL,
     note TEXT,
     indexed_at REAL NOT NULL,
-    sig BLOB
+    sig BLOB,
+    gen INTEGER
 );
 CREATE TABLE IF NOT EXISTS chunks (
     id INTEGER PRIMARY KEY,
@@ -93,6 +95,7 @@ class FileRow:
     budget: int | None
     status: str
     note: str | None = None
+    gen: int | None = None  # processing generation (None: before they were recorded)
 
 
 @dataclass
@@ -235,13 +238,18 @@ class Store:
                 self.set_meta("model_revision", MODEL_REVISION)
                 self.set_meta("dim", str(EMBED_DIM))
                 self.set_meta("created_at", str(time.time()))
+                self.set_meta("processing_generation", str(config.PROCESSING_GENERATION))
         else:
             self._check_existing(tables)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(files)")}
-        if "sig" not in cols and not readonly:  # an index from anygrep 0.1.0
-            with contextlib.suppress(sqlite3.OperationalError):  # read-only: no signatures
-                self.db.execute("ALTER TABLE files ADD COLUMN sig BLOB")
+        # Columns added after anygrep 0.1.0 (sig) and 0.2.0 (gen). A read-only
+        # open of an older index reads NULL for them.
+        for col, decl in (("sig", "BLOB"), ("gen", "INTEGER")):
+            if col not in cols and not readonly:
+                with contextlib.suppress(sqlite3.OperationalError):
+                    self.db.execute(f"ALTER TABLE files ADD COLUMN {col} {decl}")
         self._sig_col = "f.sig" if "sig" in cols or self._has_column("files", "sig") else "NULL"
+        self._gen_col = "gen" if "gen" in cols or self._has_column("files", "gen") else "NULL"
 
     def _check_existing(self, tables: set[str]) -> None:
         """Refuse files that are not anygrep indexes (without writing to
@@ -358,8 +366,8 @@ class Store:
         """Rows whose path equals root or lies below it."""
         prefix = root.rstrip("/\\") + os.sep
         cur = self.db.execute(
-            "SELECT id, path, kind, size, mtime_ns, sha256, budget, status, note FROM files "
-            "WHERE path = ? OR substr(path, 1, ?) = ?",
+            f"SELECT id, path, kind, size, mtime_ns, sha256, budget, status, note, "
+            f"{self._gen_col} FROM files WHERE path = ? OR substr(path, 1, ?) = ?",
             (root, len(prefix), prefix),
         )
         for r in cur:
@@ -367,29 +375,61 @@ class Store:
 
     def get_file(self, path: str) -> FileRow | None:
         r = self.db.execute(
-            "SELECT id, path, kind, size, mtime_ns, sha256, budget, status, note FROM files "
-            "WHERE path=?",
+            f"SELECT id, path, kind, size, mtime_ns, sha256, budget, status, note, "
+            f"{self._gen_col} FROM files WHERE path=?",
             (path,),
         ).fetchone()
         return FileRow(*r) if r else None
 
+    # -- processing generations
+    def _stale_sql(self, col: str = "") -> tuple[str, list[int]]:
+        """An SQL condition true for rows processed by an older generation
+        than their kind needs (see config.PROCESSING_GENERATION), and its
+        parameters. `col` prefixes the column names ("f.")."""
+        gen = f"{col}{self._gen_col}" if self._gen_col != "NULL" else "NULL"
+        kinds = ("text", "pdf", "image")
+        case = " ".join(f"WHEN '{k}' THEN ?" for k in kinds)
+        return (
+            f"COALESCE({gen}, 1) < (CASE {col}kind {case} ELSE 0 END)",
+            [config.required_generation(k) for k in kinds],
+        )
+
+    def is_stale(self, row: FileRow) -> bool:
+        """True when the file was processed by an older generation than its
+        kind needs: the next update processes it again."""
+        return (row.gen or 1) < config.required_generation(row.kind)
+
+    def count_stale(self, prefixes: Iterable[str] | None = None) -> int:
+        """Files (at or below any of `prefixes`; None: all) processed by an
+        older generation than their kind needs."""
+        cond, params = self._stale_sql()
+        where, more = _under_sql(prefixes)
+        (n,) = self.db.execute(
+            f"SELECT COUNT(*) FROM files WHERE {cond}{where}", params + more
+        ).fetchone()
+        return int(n)
+
     def image_shas(self, budget: int) -> dict[str, int]:
-        """{sha256: file id} of the indexed images embedded at this budget."""
+        """{sha256: file id} of the indexed images embedded at this budget
+        by the current processing generation."""
+        cond, params = self._stale_sql()
         return dict(
             self.db.execute(
                 "SELECT sha256, id FROM files WHERE kind='image' AND status='ok' AND budget=? "
-                "AND sha256 IS NOT NULL",
-                (budget,),
+                f"AND sha256 IS NOT NULL AND NOT ({cond})",
+                [budget, *params],
             ).fetchall()
         )
 
     def image_vector(self, file_id: int, sha256: str, budget: int) -> np.ndarray | None:
         """The vector of an indexed image with this content and budget (None
         when the row is gone or changed since image_shas())."""
+        cond, params = self._stale_sql("f.")
         r = self.db.execute(
             "SELECT c.vec FROM chunks c JOIN files f ON f.id=c.file_id WHERE f.id=? "
-            "AND f.kind='image' AND f.status='ok' AND f.sha256=? AND f.budget=? LIMIT 1",
-            (file_id, sha256, budget),
+            "AND f.kind='image' AND f.status='ok' AND f.sha256=? AND f.budget=? "
+            f"AND NOT ({cond}) LIMIT 1",
+            [file_id, sha256, budget, *params],
         ).fetchone()
         return None if r is None else np.frombuffer(r[0], np.float16).astype(np.float32)
 
@@ -445,9 +485,12 @@ class Store:
             self.db.execute("DELETE FROM files WHERE id=?", (old[0],))
         cur = self.db.execute(
             "INSERT INTO files(path, kind, size, mtime_ns, sha256, budget, status, note, "
-            "indexed_at, sig) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (path, kind, size, mtime_ns, sha256, budget, status, note, time.time(), sig),
-        )
+            "indexed_at, sig, gen) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                path, kind, size, mtime_ns, sha256, budget, status, note, time.time(), sig,
+                config.PROCESSING_GENERATION,
+            ),
+        )  # fmt: skip
         fid = cur.lastrowid
         assert fid is not None
         self.add_chunks(fid, chunks)
@@ -476,10 +519,11 @@ class Store:
     ) -> tuple[int, int, str | None] | None:
         """For a file left half-indexed (status 'partial') with this content:
         (file id, number of chunks stored, text of the last one)."""
+        cond, params = self._stale_sql()
         r = self.db.execute(
             "SELECT id FROM files WHERE path=? AND status='partial' AND size=? AND mtime_ns=? "
-            "AND sha256=?",
-            (path, size, mtime_ns, sha256),
+            f"AND sha256=? AND NOT ({cond})",
+            [path, size, mtime_ns, sha256, *params],
         ).fetchone()
         if r is None:
             return None
@@ -514,16 +558,12 @@ class Store:
 
     def count_files_under(self, prefixes: Iterable[str]) -> int:
         """Indexed (searchable) files at or below any of the paths."""
-        clauses, params = [], []
-        for root in prefixes:
-            prefix = root.rstrip("/\\") + os.sep
-            clauses.append("path = ? OR substr(path, 1, ?) = ?")
-            params += [root, len(prefix), prefix]
-        if not clauses:
+        prefixes = list(prefixes)
+        if not prefixes:
             return 0
-        where = " OR ".join(f"({c})" for c in clauses)
+        where, params = _under_sql(prefixes)
         (n,) = self.db.execute(
-            f"SELECT COUNT(*) FROM files WHERE status='ok' AND ({where})", params
+            f"SELECT COUNT(*) FROM files WHERE status='ok'{where}", params
         ).fetchone()
         return int(n)
 
@@ -685,6 +725,21 @@ class Store:
                 ids,
             )
         }
+
+
+def _under_sql(prefixes: Iterable[str] | None, col: str = "") -> tuple[str, list]:
+    """(" AND (...)", parameters): rows whose path is at or below one of
+    `prefixes`; ("", []) for None (no limit)."""
+    if prefixes is None:
+        return "", []
+    clauses, params = [], []
+    for root in prefixes:
+        prefix = root.rstrip("/\\") + os.sep
+        clauses.append(f"{col}path = ? OR substr({col}path, 1, ?) = ?")
+        params += [root, len(prefix), prefix]
+    if not clauses:
+        return " AND 0", []
+    return " AND (" + " OR ".join(f"({c})" for c in clauses) + ")", params
 
 
 class _Tx:

@@ -208,6 +208,15 @@ class Index:
         """The indexed folders and files, as update() without paths sees them."""
         return self._db().roots()
 
+    @property
+    @_locked
+    def update_pending(self) -> bool:
+        """True when some indexed files were processed by an older version of
+        anygrep (a fix to text extraction, chunking or the like has come
+        since). They are still searched as they are; the next update()
+        processes them again."""
+        return self._db().count_stale() > 0
+
     @_locked
     def search(
         self,

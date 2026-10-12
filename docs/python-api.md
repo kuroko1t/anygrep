@@ -46,6 +46,10 @@ next call opens the file that is there now (creating an empty one, unless `creat
 Attributes: `path` (the resolved index file), `threads`, and `roots`, the list of indexed folders and
 files.
 
+`update_pending` is `True` when some indexed files were processed by an older version of anygrep, one
+whose text extraction, chunking or image handling has since changed. They are still searched as they
+are, and the next `update()` indexes them again (resumably, like changed files).
+
 ## `Index.update(paths=None, *, image_tokens=None, images=True, extensions=(), progress=None)`
 
 Like `anygrep index`. Indexes new and changed files under `paths` (one path or a list of folders and

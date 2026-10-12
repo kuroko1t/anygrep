@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
+from . import config
 from .chunking import chunk_text
 from .config import CHUNK_OVERLAP, CHUNK_TOKENS, DEFAULT_IMAGE_BUDGET
 from .embedder import Embedder, ImageTooLarge, load_image
@@ -125,6 +126,9 @@ class IndexReport:
     errors: int = 0
     # Files that failed in an earlier run and were not tried again (unchanged).
     still_failed: int = 0
+    # Unchanged files processed again because an older anygrep processed them
+    # (see config.PROCESSING_GENERATION); also counted in `updated`.
+    outdated: int = 0
     deferred_images: int = 0
     seconds: float = 0.0
     interrupted: bool = False
@@ -247,6 +251,10 @@ def plan(
         if row.status == "partial":  # interrupted while indexing: continue it
             todo.append((e, True))
             continue
+        if store.is_stale(row):  # processed by an older anygrep: do it again
+            report.outdated += 1
+            todo.append((e, False))
+            continue
         if row.kind != e.kind or _should_retry(row.status, row.note):
             todo.append((e, False))
             continue
@@ -312,7 +320,7 @@ def _reuse_moved(
     cands: dict[tuple[str, int], list] = {}
     for row in gone:
         same_budget = row.kind != "image" or row.budget == opts.image_budget
-        if row.status == "ok" and row.sha256 and same_budget:
+        if row.status == "ok" and row.sha256 and same_budget and not store.is_stale(row):
             cands.setdefault((row.kind, row.size), []).append(row)
     if not cands:
         return todo
@@ -380,6 +388,13 @@ def run_index(
         todo, removed = plan(store, roots, opts, report, should_stop=opts.should_stop)
     else:
         todo, removed, report = planned
+    if report.outdated and not opts.quiet:
+        n = report.outdated
+        print(
+            f"{n:,} file{'s were' if n != 1 else ' was'} indexed by an older version of "
+            "anygrep; indexing again.",
+            file=sys.stderr,
+        )
     if opts.on_plan is not None:
         todo = opts.on_plan(todo)
     if removed:
@@ -767,7 +782,16 @@ def update_index(
         store.set_meta("image_budget", str(opts.image_budget))
         store.delete_meta("image_budget_pending")
     store.set_meta("last_indexed_at", str(time.time()))
+    record_generation(store)
     return rep
+
+
+def record_generation(store: Store) -> None:
+    """Record in the meta that the whole index is at the current processing
+    generation, once no file of an older one is left."""
+    current = str(config.PROCESSING_GENERATION)
+    if store.get_meta("processing_generation") != current and store.count_stale() == 0:
+        store.set_meta("processing_generation", current)
 
 
 def has_words(text: str, min_letters: int = MIN_PAGE_LETTERS) -> bool:

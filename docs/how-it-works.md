@@ -6,7 +6,9 @@ The design decisions behind these steps are in [DESIGN.md](DESIGN.md) (in Japane
    modification time with the index. If only the time changed, a SHA-256 of the content decides whether
    the file is re-embedded. A moved or renamed file with the same content keeps its embedding: images
    always, text and PDFs when the file name, which is part of the embedded title, is unchanged. Files
-   that disappeared are pruned. Text and PDFs are queued before images, and images newest first, so an
+   that disappeared are pruned. Each file also records the processing generation it was indexed with:
+   when a newer anygrep changes how some kind of file is extracted, chunked or embedded, the next update
+   indexes those files again, like changed files, without a reset. Text and PDFs are queued before images, and images newest first, so an
    interrupted run has already made the cheap and recent files searchable.
 2. Extract the text (whole file or per PDF page) and cut it into token-aware chunks with line or
    page positions. Load images with EXIF orientation applied.

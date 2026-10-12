@@ -1028,7 +1028,14 @@ class _ScanStatus:
 
 def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int | None:
     from .extract import kind_of
-    from .indexer import IndexReport, estimate_cost, plan, run_index, throughput_factor
+    from .indexer import (
+        IndexReport,
+        estimate_cost,
+        plan,
+        record_generation,
+        run_index,
+        throughput_factor,
+    )
     from .walker import WalkTruncated
 
     # Progress is visible: index the whole scope (Ctrl-C keeps what is done).
@@ -1100,6 +1107,8 @@ def _auto_index_locked(args, store, factory, walkable: list[str], note) -> int |
         _note_added(new_roots, store, note)
         raise
     store.set_meta("last_indexed_at", str(time.time()))
+    if not rep.interrupted:
+        record_generation(store)
     # Also after an interrupt: the folder stays indexed and the next run resumes it.
     _note_added(new_roots, store, note)
     if rep.interrupted:
@@ -1144,6 +1153,21 @@ def _job_notes(args) -> list[str]:
     return [f"anygrep: {_job_progress(st, args.scope)}"]
 
 
+def _outdated_notes(args, store) -> list[str]:
+    """The line about files that an older anygrep processed (see
+    config.PROCESSING_GENERATION) and that this search did not index again."""
+    n = store.count_stale(None if args.everywhere else args.scope)
+    if not n:
+        return []
+    where = "" if args.everywhere else f" {_scope_text(args.scope)}"
+    files = f"{n:,} file{'s' if n != 1 else ''}"
+    return [
+        f"anygrep: {files} here {'were' if n != 1 else 'was'} indexed by an older version of "
+        f"anygrep and will be indexed again by the next update; their results may differ "
+        f"until then. Update now with: {_hint('index')}{where}"
+    ]
+
+
 def _note_added(new_roots: list[str], store, note) -> None:
     for p in new_roots:
         n = store.count_files_under([p])
@@ -1175,6 +1199,7 @@ def _search(args, store) -> int:
             _nothing_indexed_with_job(args)
         _no_indexed_files(args, store)
     args.after_notes.extend(_job_notes(args))
+    args.after_notes.extend(_outdated_notes(args, store))
 
     budget = query_budget(store)
     embedder = factory(bool(args.image))
@@ -1302,6 +1327,7 @@ def cmd_status(args) -> int:
             throughput_factor=(
                 throughput_factor(store) if store.get_meta(CALIB_KEY) is not None else None
             ),
+            outdated_files=store.count_stale(),
         )
         if args.problems:
             info["problems"] = [
@@ -1351,6 +1377,11 @@ def cmd_status(args) -> int:
         print(
             "Last indexed: "
             + time.strftime("%Y-%m-%d %H:%M", time.localtime(info["last_indexed_at"]))
+        )
+    if info["outdated_files"]:
+        print(
+            f"Outdated: {info['outdated_files']:,} files indexed by an older version of anygrep; "
+            f"run `{_hint('index')}` to index them again"
         )
     if job is not None:
         _print_job(job)

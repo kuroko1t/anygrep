@@ -6,6 +6,15 @@ All notable changes to anygrep are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The index records the processing generation each file was indexed with. When a new version of
+  anygrep changes how some kind of file is extracted, chunked or embedded, the next update (`anygrep
+  index`, the indexing before a search, `Index.update()`) indexes those files again, with progress and
+  resumable like any other change, instead of needing `anygrep reset`. A search that does not update
+  them says so in one line on stderr; `anygrep status` shows the count and the Python API has
+  `Index.update_pending`. A different model revision still needs a reset.
+
 ### Changed
 
 - `anygrep index` exits with status 2 while a file under its PATHs has failed to index (it still
